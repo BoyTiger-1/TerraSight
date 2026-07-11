@@ -3,7 +3,11 @@ services:
     name: terrasight-climate-intelligence
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120
+    # bind to Render's $PORT on 0.0.0.0 or the health check never passes.
+    # one worker with threads fits the 512MB free tier (2 workers each load
+    # sklearn+pandas and can OOM); the work is I/O-bound on live APIs so
+    # threads give plenty of concurrency. raise workers on a paid plan.
+    startCommand: gunicorn main:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120
     region: oregon
     plan: free
     envVars:
