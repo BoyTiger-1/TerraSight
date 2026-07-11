@@ -4,8 +4,6 @@ TerraSight is an AI-powered decision support system for climate and geophysical 
 
 It is built for the kinds of users who have to act on the weather: residents, researchers, emergency managers, utilities, farmers, insurers, and planners.
 
-![TerraSight homepage](docs/screenshots/home.jpg)
-
 ## Screenshots
 
 **Command Center** — a live global disaster map with a density heatmap, filters by disaster type, NASA GIBS science layers, live event feeds, and the run-all risk matrix for any location:
