@@ -1,183 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wildfire Risk Prediction - AI-Powered Fire Safety</title>
-    <meta name="description" content="AI-powered wildfire risk assessment for the continental United States. Get real-time fire risk predictions using advanced machine learning and environmental data." />
-    <meta name="author" content="Wildfire Risk Prediction System" />
+{% extends "base.html" %}
 
-    <meta property="og:title" content="Wildfire Risk Prediction - AI-Powered Fire Safety" />
-    <meta property="og:description" content="AI-powered wildfire risk assessment for the continental United States. Get real-time fire risk predictions using advanced machine learning and environmental data." />
-    <meta property="og:type" content="website" />
+{% block content %}
 
-    <meta name="twitter:card" content="summary_large_image" />
-    
-    <link rel="stylesheet" href="{{ url_for("static", filename="style.css") }}">
-  </head>
+<section class="hero">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <div class="wrap">
+      <span class="eyebrow">Climate and natural disaster intelligence</span>
+      <h1 class="mt-2">See the planet's risk <span class="accent-word">before</span> it becomes the news.</h1>
+      <p class="lede">
+        TerraSight fuses live feeds from NASA, NOAA, USGS, and Open-Meteo with
+        machine learning trained on real historical disasters. Fifteen hazard
+        modules, explainable predictions, cascading-risk modeling, and reports
+        written for the people who have to decide.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="/dashboard">
+          Open the Command Center
+          <svg width="16" height="16"><use href="#i-arrow"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="/simulator">Try the Scenario Simulator</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="v"><em id="stat-events">0</em></div><div class="k">Live natural events</div></div>
+        <div class="stat"><div class="v" id="stat-quakes">0</div><div class="k">M4.5+ quakes, 7 days</div></div>
+        <div class="stat"><div class="v" id="stat-storms">0</div><div class="k">Active tropical cyclones</div></div>
+        <div class="stat"><div class="v">15</div><div class="k">Intelligence modules</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">Scroll</div>
+</section>
 
-  <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="nav-container">
-        <div class="nav-brand">
-          <i class="fas fa-fire flame-icon"></i>
-          <span class="brand-text">Wildfire Risk</span>
-        </div>
-        
-        <div class="nav-links">
-          <a href="/" class="nav-link active">Home</a>
-          <a href="/about" class="nav-link">About</a>
-          <a href="/ai" class="nav-link">Prediction</a>
-        </div>
-        
-        <a href="/ai" class="cta-button">Get Started</a>
-        
-        <div class="mobile-menu">
-          <i class="fas fa-bars"></i>
+<section class="section" id="modules">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">01 / Intelligence modules</span>
+      <h2>One platform. Every hazard that matters.</h2>
+      <p class="sub">Each module follows the same discipline: gather real data, engineer
+      features, predict or model impact, explain the drivers, then tell you exactly what to do.</p>
+    </div>
+    <div class="bento">
+      {% for slug, m in modules.items() %}
+      <a class="mod-card reveal {% if loop.index in [1, 6] %}wide{% endif %}" href="/module/{{ slug }}">
+        <svg class="mod-icon"><use href="#i-{{ slug }}"/></svg>
+        <h3>{{ m.title }}</h3>
+        <p>{{ m.tagline }}.</p>
+        <span class="badge kind">{{ m.kind }}</span>
+        <span class="go">Open module <svg width="13" height="13"><use href="#i-arrow"/></svg></span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <div class="track">
+    {% for _ in range(2) %}
+    <span class="item">NASA EONET</span><span class="item">NASA GIBS satellite imagery</span>
+    <span class="item">NOAA National Weather Service</span><span class="item">NOAA National Hurricane Center</span>
+    <span class="item">USGS earthquake catalog</span><span class="item">USGS river gauges</span>
+    <span class="item">USGS Volcano Hazards Program</span><span class="item">Open-Meteo forecast</span>
+    <span class="item">ERA5 reanalysis, 1940 to present</span><span class="item">Copernicus CAMS air quality</span>
+    <span class="item">GloFAS river discharge</span><span class="item">CMIP6 climate projections</span>
+    {% endfor %}
+  </div>
+</div>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">02 / How it works</span>
+      <h2>From raw satellite feed to a decision you can defend.</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><h3>Gather</h3><p>Live and historical data pulled from
+        authoritative sources: weather models, reanalysis, river gauges, seismometers,
+        fire detections, storm advisories. No manual entry, no synthetic filler.</p></div>
+      <div class="step reveal reveal-d1"><h3>Model</h3><p>Gradient-boosted models trained on real
+        documented disasters, physics-constrained so more wind can never mean less fire.
+        Where prediction is impossible, honest impact models take over.</p></div>
+      <div class="step reveal reveal-d2"><h3>Explain</h3><p>Every score ships with the variables
+        that drove it, a confidence label, and the model card behind it. No black boxes,
+        because nobody evacuates a town on a mystery number.</p></div>
+      <div class="step reveal reveal-d3"><h3>Act</h3><p>Role-targeted recommendations for
+        residents, emergency managers, utilities, farmers, and insurers, plus economic
+        exposure so the cost of waiting is visible.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0">
+  <div class="wrap">
+    <div class="grid-2">
+      <div class="card pad-lg reveal">
+        <span class="eyebrow">03 / Coupled systems</span>
+        <h2 style="font-size: 28px; margin-top: 14px">Disasters do not happen one at a time.</h2>
+        <p class="mt-2" style="color: var(--ink-2)">
+          Drought primes wildfire. Hurricanes drive flood, surge, and blackout at once.
+          Earthquakes trigger tsunamis and landslides. TerraSight models twenty documented
+          couplings between hazards, so when one score rises, everything downstream
+          updates with it.
+        </p>
+        <div class="mt-3">
+          <div class="matrix-row"><svg><use href="#i-drought"/></svg><a>Drought</a>
+            <div class="meter"><i style="width: 85%; background: var(--risk-extreme)"></i></div>
+            <span class="score risk-extreme">85</span></div>
+          <div class="matrix-row"><svg><use href="#i-cascade"/></svg><a class="muted small">cures vegetation into fuel</a>
+            <div></div><span class="score muted">+12</span></div>
+          <div class="matrix-row"><svg><use href="#i-wildfire"/></svg><a>Wildfire</a>
+            <div class="meter"><i style="width: 62%; background: var(--risk-high)"></i></div>
+            <span class="score risk-high">62</span></div>
         </div>
       </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="container">
-        <div class="hero-content">
-          <i class="fas fa-fire hero-icon"></i>
-          <h1 class="hero-title">
-            Wildfire Risk
-            <span class="hero-subtitle">Prediction</span>
-          </h1>
-          <p class="hero-description">
-            AI-powered wildfire risk assessment for the continental United States. 
-            Protect communities with advanced machine learning predictions.
-          </p>
-          <div class="hero-buttons">
-            <a href="/ai" class="btn btn-primary">Start Prediction</a>
-            <a href="/about" class="btn btn-secondary">Learn More</a>
-          </div>
+      <div class="card pad-lg reveal reveal-d1">
+        <span class="eyebrow">04 / Honest science</span>
+        <h2 style="font-size: 28px; margin-top: 14px">Prediction where possible. Impact modeling where not.</h2>
+        <p class="mt-2" style="color: var(--ink-2)">
+          No one on Earth can predict an earthquake, and TerraSight will not pretend to.
+          For earthquakes, tsunamis, and volcanoes the platform models what science
+          actually supports: exposure, shaking, aftershock probabilities, evacuation
+          priorities, and losses, built on fifty years of real catalog data.
+        </p>
+        <div class="mt-3">
+          <span class="badge"><span class="dot" style="background: var(--accent)"></span> prediction</span>
+          <span class="badge" style="margin-left: 8px"><span class="dot" style="background: var(--chart-4)"></span> impact model</span>
+          <span class="badge" style="margin-left: 8px"><span class="dot" style="background: var(--chart-2)"></span> monitoring</span>
         </div>
+        <p class="mt-2 small muted">Every module page states which one it is, in plain language, next to the score.</p>
       </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <!-- Features Section -->
-    <section class="features">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">Advanced Wildfire Intelligence</h2>
-          <p class="section-subtitle">
-            Leveraging cutting-edge AI and environmental data to provide accurate wildfire risk assessments
-          </p>
-        </div>
-
-        <div class="features-grid">
-          <div class="feature-card">
-            <i class="fas fa-brain feature-icon"></i>
-            <h3 class="feature-title">AI-Powered Analysis</h3>
-            <p class="feature-description">
-              Machine learning models trained on environmental data to predict wildfire risk with high accuracy
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <i class="fas fa-map-marker-alt feature-icon"></i>
-            <h3 class="feature-title">Location Intelligence</h3>
-            <p class="feature-description">
-              Interactive mapping with precise coordinate-based risk assessment for any location
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <i class="fas fa-bolt feature-icon"></i>
-            <h3 class="feature-title">Real-Time Data</h3>
-            <p class="feature-description">
-              Integration with live environmental data including weather, vegetation, and terrain analysis
-            </p>
-          </div>
-        </div>
+<section class="section" style="padding-top: 20px">
+  <div class="wrap">
+    <div class="card pad-lg reveal" style="text-align: center; background:
+      radial-gradient(600px 300px at 50% 0%, rgba(53,179,156,0.10), transparent 70%), linear-gradient(180deg, var(--surface-2), var(--surface));">
+      <h2 style="font-size: clamp(24px, 3vw, 36px)">Ask the planet a question.</h2>
+      <p class="mt-2 muted" style="margin-left:auto; margin-right:auto">What happens to fire risk if the wind doubles? How exposed is your city this week? Start with any location on Earth.</p>
+      <div class="hero-ctas" style="justify-content: center">
+        <a class="btn btn-primary" href="/dashboard">Run a full assessment <svg width="16" height="16"><use href="#i-arrow"/></svg></a>
+        <a class="btn btn-ghost" href="/reports">Generate an executive report</a>
       </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <!-- Environmental Analysis Section -->
-    <section class="environmental-analysis">
-      <div class="container">
-        <div class="analysis-grid">
-          <div class="analysis-content">
-            <h2 class="analysis-title">Comprehensive Environmental Analysis</h2>
-            <p class="analysis-description">
-              Our system analyzes multiple environmental factors to provide the most accurate wildfire risk predictions
-            </p>
-            
-            <div class="factors-list">
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Temperature and humidity monitoring</span>
-              </div>
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Wind speed and direction analysis</span>
-              </div>
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Precipitation and drought conditions</span>
-              </div>
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Vegetation density (NDVI) assessment</span>
-              </div>
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Terrain elevation and slope analysis</span>
-              </div>
-              <div class="factor-item">
-                <i class="fas fa-check-circle"></i>
-                <span>Historical fire occurrence patterns</span>
-              </div>
-            </div>
-          </div>
+{% endblock %}
 
-          <div class="stats-card">
-            <div class="stats-grid">
-              <div class="stat-item">
-                <i class="fas fa-chart-line stat-icon"></i>
-                <div class="stat-value">95%</div>
-                <div class="stat-label">Accuracy Rate</div>
-              </div>
-              <div class="stat-item">
-                <i class="fas fa-shield-alt stat-icon"></i>
-                <div class="stat-value">24/7</div>
-                <div class="stat-label">Monitoring</div>
-              </div>
-              <div class="stat-item">
-                <i class="fas fa-map-marker-alt stat-icon"></i>
-                <div class="stat-value">USA</div>
-                <div class="stat-label">Coverage</div>
-              </div>
-              <div class="stat-item">
-                <i class="fas fa-fire stat-icon"></i>
-                <div class="stat-value">Real-time</div>
-                <div class="stat-label">Updates</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-      <div class="container">
-        <div class="cta-card">
-          <h2 class="cta-title">Start Protecting Your Community Today</h2>
-          <p class="cta-description">
-            Get instant wildfire risk assessments for any location in the continental United States
-          </p>
-          <a href="/ai" class="btn btn-primary">Try Wildfire Prediction</a>
-        </div>
-      </div>
-    </section>
-
-    <script src="{{ url_for("static", filename="script.js") }}"></script>
-
-  </body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}

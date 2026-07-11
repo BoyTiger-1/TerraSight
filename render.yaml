@@ -1,8 +1,13 @@
 services:
   - type: web
-    name: wildfire-web-app
+    name: terrasight-climate-intelligence
     env: python
-    buildCommand: poetry install
-    startCommand: poetry run python main.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120
     region: oregon
     plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SECRET_KEY
+        generateValue: true

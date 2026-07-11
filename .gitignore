@@ -1,0 +1,23 @@
+# python bytecode caches, regenerated on every run
+__pycache__/
+*.pyc
+
+# local virtual environments
+venv/
+.venv/
+
+# training and server logs, build artifacts not source
+train_log*.txt
+server_log.txt
+
+# local sqlite database, created automatically on first run
+database/app.db
+
+# environment files holding secrets like FIRMS_MAP_KEY
+.env
+
+# editor and OS clutter
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

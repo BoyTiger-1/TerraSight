@@ -1,225 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>About - Wildfire Risk Prediction Technology</title>
-    <meta name="description" content="Learn about our AI-powered wildfire risk prediction technology and how we protect communities through advanced machine learning and environmental data analysis." />
-    <meta name="author" content="Wildfire Risk Prediction System" />
+{% extends "base.html" %}
+{% block title %}About | TerraSight{% endblock %}
 
-    <meta property="og:title" content="About - Wildfire Risk Prediction Technology" />
-    <meta property="og:description" content="Learn about our AI-powered wildfire risk prediction technology and how we protect communities through advanced machine learning and environmental data analysis." />
-    <meta property="og:type" content="website" />
+{% block content %}
+<div class="wrap">
+  <div class="module-hero">
+    <span class="eyebrow">About TerraSight</span>
+    <h1 style="margin-top: 12px; max-width: 18ch">Built because the smoke reached our street.</h1>
+  </div>
 
-    <meta name="twitter:card" content="summary_large_image" />
-    
-    <link rel="stylesheet" href="{{ url_for("static", filename="style.css") }}">
+  <div class="grid-2 mt-3">
+    <div class="card pad-lg">
+      <div class="panel-title">The story</div>
+      <p style="color: var(--ink-2)">
+        Two years ago a wildfire broke out an hour from my community. For days the air
+        was thick with smoke, evacuation alerts loomed, and my family packed bags we
+        hoped we would not need. We were lucky. The LA fires that followed showed how
+        many people are not.
+      </p>
+      <p class="mt-2" style="color: var(--ink-2)">
+        I started with a single wildfire prediction model. It worked, but the more I
+        learned, the clearer it became that no hazard exists alone: the drought feeds
+        the fire, the fire poisons the air, the burn scar sheds the debris flow. So the
+        one model became fifteen coordinated modules, and the demo data became real
+        satellite feeds, reanalysis archives, river gauges, and seismic catalogs.
+      </p>
+      <p class="mt-2" style="color: var(--ink-2)">
+        TerraSight is what I wished existed when we were watching that smoke column:
+        one place that says what is likely, why, how confident it is, and what to do.
+      </p>
+    </div>
 
-  </head>
+    <div class="card pad-lg">
+      <div class="panel-title">Design principles</div>
+      <div class="rec advisory"><div class="act">Real data or no data.</div>
+        <div class="why">Every number traces to NASA, NOAA, USGS, or Open-Meteo. The training sets are documented historical disasters matched with ERA5 reanalysis, and each module lists its sources.</div></div>
+      <div class="rec advisory"><div class="act">Explainable, or it does not ship.</div>
+        <div class="why">Each prediction shows the variables that drove it, a confidence label, and a model card with cross-validated performance.</div></div>
+      <div class="rec advisory"><div class="act">Honest about the limits of science.</div>
+        <div class="why">Earthquakes and eruptions cannot be predicted. Those modules model impact and readiness instead, and say so on the page.</div></div>
+      <div class="rec advisory"><div class="act">Physics beats overfitting.</div>
+        <div class="why">The ML models are monotonically constrained: more wind can never mean less fire, more rain can never mean more drought.</div></div>
+    </div>
+  </div>
 
-  <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="nav-container">
-        <div class="nav-brand">
-          <i class="fas fa-fire flame-icon"></i>
-          <span class="brand-text">Wildfire Risk</span>
-        </div>
-        
-        <div class="nav-links">
-          <a href="/" class="nav-link">Home</a>
-          <a href="/about" class="nav-link active">About</a>
-          <a href="/ai" class="nav-link">Prediction</a>
-        </div>
-        
-        <a href="/ai" class="cta-button">Get Started</a>
-        
-        <div class="mobile-menu">
-          <i class="fas fa-bars"></i>
-        </div>
-      </div>
-    </nav>
+  <div class="card pad-lg mt-3">
+    <div class="panel-title">Technology</div>
+    <div class="table-scroll"><table class="data">
+      <thead><tr><th>Layer</th><th>What runs there</th></tr></thead>
+      <tbody>
+        <tr><td>Machine learning</td><td>Gradient-boosted classifiers (scikit-learn) trained on 80 documented US wildfires and 37 US floods with ERA5 features, monotonic physics constraints, occlusion-based local explanations</td></tr>
+        <tr><td>Science models</td><td>SPI-style drought ranking, percentile heatwave detection, Caine intensity-duration landslide thresholds, Gutenberg-Richter seismicity, Omori aftershock decay, Rankine cyclone wind decay, FAO-56 water balance</td></tr>
+        <tr><td>Data feeds</td><td>Open-Meteo (forecast, ERA5 archive, air quality, GloFAS flood, CMIP6, marine, elevation), USGS (earthquakes, river gauges, volcanoes), NOAA (NWS alerts, NHC storms), NASA (EONET, GIBS, FIRMS)</td></tr>
+        <tr><td>Backend</td><td>Python, Flask, cached data layer, 15 module engines plus cascade, scenario, report, and economics services</td></tr>
+        <tr><td>Frontend</td><td>Vanilla JavaScript, Leaflet with NASA GIBS satellite layers, Chart.js, a single design system</td></tr>
+      </tbody>
+    </table></div>
+  </div>
 
-    <!-- Hero Section -->
-    <section class="about-hero">
-      <div class="container">
-        <div class="about-hero-content">
-          <i class="fas fa-fire hero-icon"></i>
-          <h1 class="about-title">About Our Technology</h1>
-          <p class="about-deion">
-            Our AI-powered wildfire risk prediction system combines advanced machine learning 
-            with comprehensive environmental data to protect communities across the United States.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Mission Section -->
-    <section class="mission">
-      <div class="container">
-        <div class="mission-card">
-          <div class="mission-grid">
-            <div class="mission-content">
-              <h2 class="mission-title">Our Mission</h2>
-              <p class="mission-text">
-                We're dedicated to reducing wildfire risks through cutting-edge artificial intelligence 
-                and data science. Our goal is to provide communities, emergency responders, and 
-                policymakers with the tools they need to make informed decisions about wildfire preparedness.
-              </p>
-              <p class="mission-text">
-                By leveraging machine learning and real-time environmental data, we aim to save lives, 
-                protect property, and preserve natural ecosystems across America.
-              </p>
-            </div>
-            <div class="mission-stats">
-              <div class="mission-stat">
-                <i class="fas fa-shield-alt mission-stat-icon"></i>
-                <h3 class="mission-stat-title">Protection</h3>
-                <p class="mission-stat-desc">Safeguarding communities through early detection</p>
-              </div>
-              <div class="mission-stat">
-                <i class="fas fa-chart-line mission-stat-icon"></i>
-                <h3 class="mission-stat-title">Accuracy</h3>
-                <p class="mission-stat-desc">95% prediction accuracy with advanced AI</p>
-              </div>
-              <div class="mission-stat">
-                <i class="fas fa-users mission-stat-icon"></i>
-                <h3 class="mission-stat-title">Community</h3>
-                <p class="mission-stat-desc">Empowering local decision makers</p>
-              </div>
-              <div class="mission-stat">
-                <i class="fas fa-globe mission-stat-icon"></i>
-                <h3 class="mission-stat-title">Coverage</h3>
-                <p class="mission-stat-desc">Continental United States monitoring</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Technology Section -->
-    <section class="technology">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">How It Works</h2>
-          <p class="section-subtitle">
-            Our system combines multiple data sources and advanced algorithms to provide accurate wildfire risk predictions
-          </p>
-        </div>
-
-        <div class="tech-grid">
-          <div class="tech-card">
-            <i class="fas fa-database tech-icon"></i>
-            <h3 class="tech-title">Data Collection</h3>
-            <p class="tech-description">
-              We aggregate real-time data from weather stations, satellite imagery, and environmental sensors across the country.
-            </p>
-            <ul class="tech-list">
-              <li>• Temperature and humidity</li>
-              <li>• Wind patterns</li>
-              <li>• Precipitation levels</li>
-              <li>• Vegetation density (NDVI)</li>
-            </ul>
-          </div>
-
-          <div class="tech-card">
-            <i class="fas fa-brain tech-icon"></i>
-            <h3 class="tech-title">AI Processing</h3>
-            <p class="tech-description">
-              Advanced machine learning models analyze patterns and correlations to predict wildfire risk probability.
-            </p>
-            <ul class="tech-list">
-              <li>• Decision Tree analysis</li>
-              <li>• Historical pattern recognition</li>
-              <li>• Risk factor weighting</li>
-              <li>• Predictive modeling</li>
-            </ul>
-          </div>
-
-          <div class="tech-card">
-            <i class="fas fa-exclamation-triangle tech-icon"></i>
-            <h3 class="tech-title">Risk Assessment</h3>
-            <p class="tech-description">
-              Real-time risk scores are generated for specific locations, providing actionable insights for decision makers.
-            </p>
-            <ul class="tech-list">
-              <li>• Location-specific scoring</li>
-              <li>• Risk probability percentages</li>
-              <li>• Environmental factor analysis</li>
-              <li>• Time-based predictions</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Environmental Factors -->
-    <section class="environmental-factors">
-      <div class="container">
-        <div class="factors-card">
-          <h2 class="factors-title">Environmental Factors We Monitor</h2>
-          
-          <div class="factors-grid">
-            <div class="factor-item">
-              <div class="factor-icon">🌡️</div>
-              <h3 class="factor-title">Temperature</h3>
-              <p class="factor-desc">High temperatures increase fire risk by drying vegetation and creating favorable ignition conditions.</p>
-            </div>
-
-            <div class="factor-item">
-              <div class="factor-icon">💧</div>
-              <h3 class="factor-title">Humidity</h3>
-              <p class="factor-desc">Low humidity levels reduce moisture in vegetation, making it more susceptible to ignition.</p>
-            </div>
-
-            <div class="factor-item">
-              <div class="factor-icon">💨</div>
-              <h3 class="factor-title">Wind Speed</h3>
-              <p class="factor-desc">Wind accelerates fire spread and can carry embers to new locations, increasing risk area.</p>
-            </div>
-
-            <div class="factor-item">
-              <div class="factor-icon">🌧️</div>
-              <h3 class="factor-title">Precipitation</h3>
-              <p class="factor-desc">Recent rainfall reduces fire risk by increasing moisture content in soil and vegetation.</p>
-            </div>
-
-            <div class="factor-item">
-              <div class="factor-icon">🌿</div>
-              <h3 class="factor-title">Vegetation (NDVI)</h3>
-              <p class="factor-desc">Vegetation density and health affects fuel availability and fire intensity potential.</p>
-            </div>
-
-            <div class="factor-item">
-              <div class="factor-icon">⛰️</div>
-              <h3 class="factor-title">Terrain</h3>
-              <p class="factor-desc">Elevation and slope influence fire behavior, with steeper terrain accelerating fire spread.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Disclaimer -->
-    <section class="disclaimer">
-      <div class="container">
-        <div class="disclaimer-card">
-          <i class="fas fa-exclamation-triangle disclaimer-icon"></i>
-          <h3 class="disclaimer-title">Important Disclaimer</h3>
-          <p class="disclaimer-text">
-            This is a demonstration system using a mix of synthetic data and real data. 
-            The results may be inaccurate. Always consult official wildfire warnings during fire season 
-            and follow guidance from local emergency management authorities.
-          </p>
-          <div class="disclaimer-buttons">
-            <a href="/ai" class="btn btn-primary">Try the System</a>
-            <a href="/" class="btn btn-secondary">Back to Home</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <script src="{{ url_for("static", filename="script.js") }}"></script>
-  </body>
-</html>
+  <div class="card pad-lg mt-3" style="text-align: center">
+    <h3>The wildfire module that started it all is still here.</h3>
+    <p class="muted mt-1" style="margin-left: auto; margin-right: auto">Now trained on real fires instead of synthetic data, and surrounded by fourteen siblings.</p>
+    <div class="hero-ctas" style="justify-content: center">
+      <a class="btn btn-primary" href="/module/wildfire">Open Wildfire Intelligence <svg width="16" height="16"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</div>
+{% endblock %}

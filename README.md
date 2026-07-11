@@ -1,161 +1,144 @@
-# Wildfire Risk Prediction System
+# TerraSight, Climate and Natural Disaster Intelligence Platform
 
-A web-based wildfire risk prediction system powered by machine learning that provides real-time wildfire risk assessment for locations within the continental United States.
+TerraSight is an AI-powered decision support system for climate and geophysical hazards. It grew out of a standalone wildfire risk predictor into a full intelligence platform: fifteen hazard modules, live scientific data feeds, machine learning trained on real historical disasters, cross-hazard cascade modeling, a scenario simulator, economic impact analysis, and auto-generated executive reports.
 
-## Inspiration
-Two years ago, my community was reminded of how close we all are to the devastating impacts of wildfires. A massive fire had broken out near a town just an hour away from us. For days, the air was thick with smoke, evacuation alerts loomed, and my family and neighbors prepared in case we had to leave our homes behind. Although we were fortunate not to evacuate, the fear and uncertainty left a lasting impression on me. Furthermore, the LA wildfires erupted with terrifying intensity, destroying entire neighborhoods, displacing thousands of families, and showing how quickly a spark can lead to a disaster. Seeing these events happen so close to home, I realized that climate change and wildfire risk are not distant issues, but they’re immediate, life-altering threats. This inspired me to act, to use the skills I’m developing in artificial intelligence and data science to create something meaningful. By building a Wildfire Risk Prediction AI, I want to contribute to early detection and prevention, helping communities prepare before it’s too late. My goal is to turn the anxiety and helplessness of those moments into something constructive, with technology that empowers people and protects lives.
+It is built for the kinds of users who have to act on the weather: residents, researchers, emergency managers, utilities, farmers, insurers, and planners.
 
+## Why it exists
 
-## Features
+Two years ago a wildfire broke out an hour from my community. The air was thick with smoke for days and my family packed bags we hoped we would not need. The LA fires that followed made the lesson permanent. I started with a single wildfire model, then kept going: no hazard exists alone, and nobody should have to interpret a raw risk score during an emergency.
 
-- **Location Input**: Enter coordinates manually or select locations on an interactive map
-- **Automatic Data Fetching**: Automatically retrieves current weather, vegetation, and terrain data
-- **Manual Data Input**: Option to manually input environmental parameters for custom scenarios
-- **Risk Assessment**: Provides wildfire risk probability with color-coded risk levels (Low, Moderate, High, Extreme)
-- **Responsive Design**: Works on both desktop and mobile devices
-- **Real-time Predictions**: Instant predictions using a trained Random Forest model
+## The fifteen intelligence modules
 
-## System Requirements
+| Module | Type | What it does |
+|---|---|---|
+| Wildfire Intelligence | prediction | ML ignition risk from live fire weather, fuel dryness, terrain, live fire detections, and Red Flag Warnings |
+| Flood Intelligence | prediction | ML rainfall-flood probability blended with GloFAS river discharge percentiles, USGS gauges, and NWS flood alerts |
+| Drought Intelligence | prediction | 90-day precipitation ranked against a 30-year local baseline, soil moisture, evaporative demand, US Drought Monitor style categories |
+| Air Quality Intelligence | prediction | Live PM2.5, ozone, and US AQI from the Copernicus CAMS model with a 4-day outlook and wildfire smoke attribution |
+| Heatwave Intelligence | prediction | Forecast temperatures ranked against 30-year same-season percentiles at that exact location, plus warm-night mortality signals |
+| Agriculture Intelligence | prediction | FAO-56 water balance, growing degree days, soil moisture, frost and heat stress for crops |
+| Climate Trends | monitoring | Warming trend since the 1990s from ERA5 and CMIP6 projections to 2050 for any point on Earth |
+| Infrastructure Risk | impact | FEMA lifelines style rollup: how current hazards stress power, transport, hospitals, water, and housing |
+| Tropical Cyclone Intelligence | prediction | Live NHC storm tracking, Rankine wind field estimates at your location, sea surface temperature as fuel |
+| Tornado Intelligence | prediction | Ingredients-based convective assessment (CAPE, gusts, moisture) overridden by live NWS watches and warnings |
+| Tsunami Intelligence | impact | Coastal exposure from elevation and shore proximity plus regional undersea seismicity and live tsunami messages |
+| Landslide Intelligence | prediction | Caine (1980) rainfall intensity-duration thresholds weighted by slope, antecedent moisture, burn scars, and recent quakes |
+| Avalanche Intelligence | prediction | New snow loading, wind slab, rapid warming, and rain-on-snow signals gated by snowpack depth and slope |
+| Volcanic Activity | impact | Live USGS alert levels for every monitored US volcano, seismic unrest detection, ashfall guidance |
+| Earthquake Impact | impact | Real 50-year seismicity rates (Gutenberg-Richter), shaking attenuation, Omori aftershock probabilities, loss modeling |
 
-- Python 3.11+
-- Flask web framework
-- Required Python packages (see requirements.txt)
+Modules marked impact are honestly framed: science cannot predict earthquakes, tsunamis, or eruptions, so those modules model exposure, readiness, and consequences instead of pretending to forecast the event. Each module page says which kind it is next to the score.
 
-## Installation
+## What makes it different
 
-1. **Extract the application files** to your desired directory
-2. **Navigate to the application directory**:
-   ```bash
-   cd wildfire-web-app
-   ```
-3. **Activate the virtual environment**:
-   ```bash
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-4. **Install dependencies** (if not already installed):
-   ```bash
-   pip install -r requirements.txt
-   ```
-## Technology Stack
+- Real data only. Every number traces to a live or historical feed from NASA, NOAA, USGS, or Open-Meteo. There is no synthetic or manually entered data anywhere in the pipeline.
+- ML trained on real disasters. The wildfire model is trained on 80 documented US wildfire ignition days (Camp Fire, Dixie, Marshall, Palisades, and others from CAL FIRE, InciWeb, and NIFC records) matched with ERA5 reanalysis weather. The flood model is trained on 37 documented US flood disasters. Cross-validated ROC AUC is 0.875 for wildfire and 0.912 for flood.
+- Physics-constrained models. Both classifiers use monotonic constraints, so more wind can never mean less fire and more rain can never mean more drought. The constraints also improved cross-validated accuracy.
+- Explainable everywhere. Every score ships with per-variable contributions (occlusion analysis against training medians), a confidence label, and a full model card.
+- Cascading hazards. Twenty documented couplings connect the modules: drought primes wildfire, hurricanes drive flood and outages, quakes raise tsunami and landslide risk, eruptions degrade air quality. When one score rises, downstream scores update.
+- Scenario simulation. Load real current conditions for any location, then shift temperature, precipitation, wind, humidity, snowpack, or sea surface temperature and watch every model rerun. Answers questions like "what if rainfall doubles" or "what does plus 2 degrees do here".
+- Executive reports. One click produces a professional multi-hazard situation report: summary, conditions, risk register, per-hazard analysis, cascade interactions, prioritized actions by audience, economic exposure, and data provenance. Print-ready.
+- Economic impact. Population exposure from real census figures plus severity-scaled damage ratios in the spirit of FEMA Hazus, labeled clearly as order-of-magnitude planning estimates.
 
-- **Machine Learning**: Random Forest Classifier (scikit-learn)
-- **Backend**: Python
-- **Frontend**: HTML/CSS/JavaScript
-- **Key Libraries**: scikit-learn, pandas, NumPy, Geopy, Requests
-- **Deployment**: Render
-- **Data Sources**: NASA FIRMS (real-time), Synthetic Data (training), USGS Elevation Data
+## Data sources
 
-## Configuration
+All feeds are free, and no API key is required for anything.
 
-### API Keys (Optional)
+| Provider | Feeds used |
+|---|---|
+| Open-Meteo | Weather forecast, ERA5 reanalysis back to 1940, CAMS air quality, GloFAS river discharge, CMIP6 climate projections, marine conditions, elevation, geocoding |
+| USGS | Live and 50-year earthquake catalogs, NWIS river gauges, Volcano Hazards Program alert levels |
+| NOAA | National Weather Service active alerts, National Hurricane Center storm feed |
+| NASA | EONET natural event tracker, GIBS satellite tile layers, FIRMS fire detections (optional key enables VIIRS detail) |
 
-For real-time weather data, you can configure the following API keys:
+Optional: set `FIRMS_MAP_KEY` (free from NASA FIRMS) for point-level VIIRS fire detections. Without it the platform falls back to NASA EONET wildfire events automatically.
 
-1. **OpenWeatherMap API Key** (for weather data):
-   - Sign up at https://openweathermap.org/api
-   - Set the environment variable: `export OPENWEATHER_API_KEY=your_api_key`
-   - Or provide it through the web interface
+## Running locally
 
-2. **NASA FIRMS MAP_KEY** (for fire data):
-   - Request at https://firms.modaps.eosdis.nasa.gov/api/map_key/
-   - Set the environment variable: `export FIRMS_MAP_KEY=your_map_key`
-
-**Note**: The system works without API keys using synthetic data for demonstration purposes.
-
-## Running the Application
-
-1. **Start the Flask server**:
-   ```bash
-   python src/main.py
-   ```
-
-2. **Access the application**:
-   - Open your web browser
-   - Navigate to `http://localhost:5000`
-
-3. **Using the application**:
-   - Enter latitude and longitude coordinates (e.g., 34.0522, -118.2437 for Los Angeles)
-   - Choose between automatic data fetching or manual input
-   - Click "Predict Wildfire Risk" to get the assessment
-
-## API Endpoints
-
-The application provides REST API endpoints:
-
-- `POST /api/wildfire/predict` - Predict wildfire risk with automatic data fetching
-- `POST /api/wildfire/predict-manual` - Predict wildfire risk with manual data input
-- `GET /api/wildfire/health` - Health check endpoint
-
-### Example API Usage
+Requirements: Python 3.11 or newer.
 
 ```bash
-# Automatic prediction
-curl -X POST http://localhost:5000/api/wildfire/predict \
-  -H "Content-Type: application/json" \
-  -d '{"latitude": 34.0522, "longitude": -118.2437}'
-
-# Manual prediction
-curl -X POST http://localhost:5000/api/wildfire/predict-manual \
-  -H "Content-Type: application/json" \
-  -d '{
-    "latitude": 34.0522,
-    "longitude": -118.2437,
-    "temperature": 35,
-    "humidity": 15,
-    "wind_speed": 25,
-    "precipitation": 0,
-    "ndvi": 0.2,
-    "elevation": 500,
-    "slope": 15
-  }'
+git clone https://github.com/BoyTiger-1/wildfire-web-app.git
+cd wildfire-web-app
+pip install -r requirements.txt
+python main.py
 ```
 
-## Model Information
+Open http://localhost:5000. The first assessment on a new location takes 10 to 60 seconds while live feeds are pulled; repeat runs are fast because responses are cached.
 
-The system uses a Random Forest classifier trained on synthetic data that considers:
+### Retraining the models
 
-- **Weather factors**: Temperature, humidity, wind speed, precipitation
-- **Vegetation factors**: NDVI (Normalized Difference Vegetation Index)
-- **Terrain factors**: Elevation and slope
+Trained models ship in `src/ml/models/`. To retrain from scratch against the real event catalogs (about 500 ERA5 fetches, 10 to 15 minutes):
 
-## Usage
+```bash
+python -m src.ml.train
+```
 
-- Access the web interface at https://wildfire-web-app.onrender.com
-- Enter location coordinates (latitude/longitude) or use the map to select coordinates
-- Adjust environmental parameters or use current conditions
-- Click "Predict" to generate wildfire risk percentage
-- View results on interactive map
+This regenerates the model files and their model cards, including cross-validated metrics.
 
-### Risk Levels
+## Pages
 
-- **Low** (< 30%): Green indicator
-- **Moderate** (30-60%): Yellow indicator  
-- **High** (60-80%): Orange indicator
-- **Extreme** (> 80%): Red indicator
+- `/` platform homepage with live global event counts
+- `/dashboard` command center: global map with NASA GIBS layers, live EONET, NHC, and USGS feeds, and the run-all risk matrix
+- `/module/<slug>` any of the fifteen module pages, for example `/module/wildfire`
+- `/simulator` scenario simulator
+- `/reports` executive report generator
+- `/about` project story and methodology overview
 
-## Limitations
+Tool pages accept `?lat=&lon=&name=` query parameters, so assessments are shareable links.
 
-- **Demonstration System**: Uses synthetic training data for demonstration purposes
-- **Geographic Scope**: Limited to continental United States coordinates
-- **Data Sources**: For production use, integrate real historical weather, vegetation, and fire occurrence data
-- **Model Accuracy**: The current model is trained on synthetic data and should be retrained with real data for production use
+## API
 
-## Troubleshooting
+All endpoints return JSON.
 
-### Common Issues
+| Endpoint | Description |
+|---|---|
+| `GET /api/geocode?q=denver` | Location search |
+| `GET /api/assess/<module>?lat=..&lon=..` | Run one module, for example `/api/assess/wildfire` |
+| `GET /api/assess-all?lat=..&lon=..` | Run all fifteen modules plus cascade coupling |
+| `GET /api/report?lat=..&lon=..` | Full executive report |
+| `GET /api/scenario/knobs` | Available simulator adjustments |
+| `POST /api/scenario/run` | Body `{lat, lon, deltas}`, returns before and after scores |
+| `GET /api/live/overview` | Global live events, storms, and significant quakes |
+| `POST /api/wildfire/predict` | Legacy wildfire endpoint, same contract as the original app, now backed by the real-data model |
+| `POST /api/wildfire/predict-manual` | Legacy manual-input endpoint, kept for backward compatibility |
 
-1. **"Failed to fetch" error**: Check that the Flask server is running and accessible
-2. **Invalid coordinates**: Ensure latitude is between -90 and 90, longitude between -180 and 180
-3. **Location outside USA**: The system only accepts coordinates within the continental United States
-4. **Missing dependencies**: Run `pip install -r requirements.txt` to install all required packages
+## Architecture
 
-### Development
+```
+main.py                  Flask app and page routes
+src/
+  config.py              API endpoints and shared constants
+  http_client.py         cached HTTP layer for all upstream feeds
+  services/              Open-Meteo, USGS, NOAA, NASA clients
+  data/                  real event catalogs and reference data
+    fire_history.py        80 documented US wildfire ignitions
+    flood_history.py       37 documented US flood disasters
+    cities.py              120 largest US cities, 2020 census populations
+    volcano_coords.py      Smithsonian GVP coordinates for monitored volcanoes
+  ml/
+    features.py          feature engineering shared by training and inference
+    train.py             training pipeline against the real event catalogs
+    registry.py          model loading, prediction, occlusion explanations
+    models/              trained models and model cards
+  modules/               the fifteen intelligence modules plus shared helpers
+  analysis/
+    cascades.py          cross-hazard coupling engine
+    scenario.py          what-if simulator
+    reports.py           executive report generator
+    economics.py         population exposure and loss estimates
+  routes/                REST API blueprints
+templates/  static/      frontend pages, design system, page scripts
+```
 
-To modify or extend the system:
+## Honest limitations
 
-1. **Backend changes**: Edit files in `src/` directory
-2. **Frontend changes**: Modify files in `src/static/` directory
-3. **Model improvements**: Update `wildfire_predictor.py` with new features or algorithms
-4. **API extensions**: Add new routes in `src/routes/` directory
+- Economic figures are planning estimates, accurate to order of magnitude, not underwriting values.
+- The training catalogs are US-heavy, so ML scores are best calibrated for North America. The index-based modules are global.
+- NWS alerts, USGS river gauges, and USGS volcano alert levels only cover the United States; the platform degrades gracefully elsewhere.
+- TerraSight is a decision-support and education tool, not an official warning source. In an emergency, follow your local authorities.
 
+## Deployment
 
+`render.yaml` deploys the platform on Render with gunicorn. Set `FIRMS_MAP_KEY` in the environment if you have one. A `SECRET_KEY` is generated automatically.

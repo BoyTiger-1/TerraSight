@@ -1,0 +1,24 @@
+{
+  "name": "flood",
+  "algorithm": "HistGradientBoostingClassifier",
+  "trained_on": "real historical events + ERA5 reanalysis (Open-Meteo archive)",
+  "n_samples": 171,
+  "n_positives": 37,
+  "cv_roc_auc_mean": 0.912,
+  "cv_roc_auc_std": 0.067,
+  "cv_balanced_accuracy": 0.856,
+  "feature_importances": {
+    "precip_3d_mm": 0.1488,
+    "precip_1d_mm": 0.0385,
+    "tmax_c": 0.0105,
+    "tmin_c": 0.0018,
+    "snowfall_30d_cm": 0.0016,
+    "et0_30d_mm": 0.0005,
+    "wet_days_30d": 0.0002,
+    "precip_30d_mm": -0.0,
+    "precip_7d_mm": 0.0,
+    "precip_max1d_30d_mm": 0.0,
+    "api_index": -0.0001
+  },
+  "trained_at": "2026-07-10"
+}

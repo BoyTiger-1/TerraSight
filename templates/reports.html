@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Executive Reports | TerraSight{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="module-hero no-print">
+    <span class="eyebrow">Executive Reports</span>
+    <h1 style="margin-top: 12px">The situation, written up properly.</h1>
+    <p class="tagline">A full multi-hazard assessment in the language of an emergency
+    management briefing: conditions, risks, cascades, actions, exposure, and confidence.
+    Print it, share it, or read it in two minutes.</p>
+    <div class="split mt-3" style="max-width: 700px; justify-content: flex-start; gap: 14px">
+      <div class="searchbox" style="flex: 1; min-width: 260px">
+        <input class="input" id="loc-search" type="search" autocomplete="off"
+               placeholder="Search a location for the report..." aria-label="Search for a location">
+      </div>
+      <button class="btn btn-ghost" id="print-btn" hidden onclick="window.print()">
+        <svg width="15" height="15"><use href="#i-doc"/></svg> Print or save PDF
+      </button>
+    </div>
+  </div>
+
+  <div id="loading" hidden class="mt-3 no-print">
+    <div class="card"><div class="spinner-line">Running all fifteen modules and writing the report. Expect up to a minute on a fresh location...</div></div>
+  </div>
+
+  <article class="report-paper mt-3" id="paper" hidden></article>
+
+  <div class="section no-print" id="empty-state">
+    <div class="card pad-lg" style="text-align: center">
+      <svg width="42" height="42" style="color: var(--accent)"><use href="#i-doc"/></svg>
+      <h3 class="mt-2">Search a location to generate its report.</h3>
+      <p class="muted mt-1" style="margin-left: auto; margin-right: auto">Every report is generated
+      fresh from live data at the moment you ask.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

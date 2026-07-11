@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TerraSight, Climate and Natural Disaster Intelligence{% endblock %}</title>
+  <meta name="description" content="{% block description %}TerraSight is an AI-powered climate and natural disaster intelligence platform: 15 hazard modules, real scientific data, explainable machine learning, scenario simulation, and executive reporting.{% endblock %}">
+  <meta property="og:title" content="TerraSight Climate Intelligence">
+  <meta property="og:description" content="Multi-hazard prediction and impact analysis built on live NASA, NOAA, USGS, and Open-Meteo data.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body data-palette="#279b87,#5b93d9,#bd8428,#b06fb0">
+<a class="skip-link" href="#main">Skip to content</a>
+
+{# every icon in the app lives in this sprite, real SVG, no emoji anywhere #}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8"/><path d="M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18"/>
+    </symbol>
+    <symbol id="i-wildfire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21c-3.9 0-6.5-2.5-6.5-6 0-2.6 1.6-4.4 3-6 .5 1 .8 1.6 1.7 2.3C10.4 8.5 11 5.6 13.5 3c.4 2.7 1.5 4 2.8 5.5 1.2 1.4 2.2 3 2.2 5.5 0 4.5-3.5 7-6.5 7Z"/><path d="M12 21c-1.7 0-3-1.3-3-3.2 0-1.4 1-2.5 2-3.8.9 1.1 4 2.1 4 4.3 0 1.6-1.3 2.7-3 2.7Z"/>
+    </symbol>
+    <symbol id="i-flood" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M12 3.5s5.5 6 5.5 10a5.5 5.5 0 0 1-11 0c0-4 5.5-10 5.5-10Z"/><path d="M3 20.5c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/>
+    </symbol>
+    <symbol id="i-drought" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="9" r="3.5"/><path d="M12 2.5V4M18.5 9H20M4 9h1.5M16.6 4.4l-1 1M7.4 4.4l1 1"/><path d="M3.5 16l3 3 2.5-4 3 4.5 2.5-4 3 3.5 3-3"/>
+    </symbol>
+    <symbol id="i-air-quality" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 8h9.5a3 3 0 1 0-3-3M3 12h14.5a3 3 0 1 1 3 3H14M3 16h6.5a3 3 0 1 1-3 3"/>
+    </symbol>
+    <symbol id="i-heatwave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M10 13.7V5a2 2 0 1 1 4 0v8.7a4.2 4.2 0 1 1-4 0Z"/><circle cx="12" cy="17.5" r="1.6" fill="currentColor" stroke="none"/><path d="M17.5 5.5h4M17.5 9h3M17.5 12.5h4"/>
+    </symbol>
+    <symbol id="i-agriculture" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21V10"/><path d="M12 13c0-4.5-3-7.5-8-8 .3 4.8 3.2 7.8 8 8Z"/><path d="M12 10c0-3.8 2.6-6.3 7-6.8-.2 4-2.8 6.5-7 6.8Z"/><path d="M6 21h12"/>
+    </symbol>
+    <symbol id="i-climate-trends" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 20.5v-17M3.5 20.5h17"/><path d="M6.5 16.5 11 12l3 3 6-6.5"/><path d="M16.5 8.5H20V12"/>
+    </symbol>
+    <symbol id="i-infrastructure" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 21h18"/><path d="M5 21V8l5-4v17M14 21V11l5 3v7"/><path d="M7.5 9.5v1M7.5 13v1M7.5 16.5v1"/>
+    </symbol>
+    <symbol id="i-cyclone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <circle cx="12" cy="12" r="2.6"/><path d="M12 9.4c0-3.4 2.4-5.9 6-6.4-1.2 2-1.4 3.6-1 6M12 14.6c0 3.4-2.4 5.9-6 6.4 1.2-2 1.4-3.6 1-6"/>
+    </symbol>
+    <symbol id="i-tornado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h18M5 9h13M8 13h9M10 17h5M12.5 21h1.5"/>
+    </symbol>
+    <symbol id="i-tsunami" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 18.5c1-6 4.5-11 9.5-11 3.4 0 5.8 2.2 6.5 5-1-.7-2.2-1-3.5-.8 2.2 1.6 3 3.8 2.5 6.8H3Z"/><path d="M3 21.5h18"/>
+    </symbol>
+    <symbol id="i-landslide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 20 13 4l3.5 5.5L21 20H3Z"/><path d="M9.5 9.5 8 12l2 1.5-1.5 3 2.5 1"/>
+    </symbol>
+    <symbol id="i-avalanche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v18M12 3l3 3M12 3 9 6M12 21l3-3M12 21l-3-3M3 12h18M3 12l3 3M3 12l3-3M21 12l-3 3M21 12l-3-3M5.6 5.6l12.8 12.8M5.6 18.4 18.4 5.6" stroke-width="1.4"/>
+    </symbol>
+    <symbol id="i-volcano" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 9h6l5 11H4L9 9Z"/><path d="M10.5 9 9 4.5M13.5 9 15 4.5M12 8V2.5" />
+    </symbol>
+    <symbol id="i-earthquake" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2.5 12h4l2-6 3 12 2.5-9 1.5 3h6"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.6-4.6"/>
+    </symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/>
+    </symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12h16M13 5l7 7-7 7"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.5 22 20H2L12 3.5Z"/><path d="M12 10v4.5M12 17.5v.1"/>
+    </symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>
+    </symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 2.5h8l4.5 4.5v14.5H6V2.5Z"/><path d="M14 2.5V7h4.5M9 12h6M9 15.5h6M9 19h4"/>
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/><path d="m3 17.5 9 5 9-5" opacity="0.5"/>
+    </symbol>
+    <symbol id="i-cascade" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5.5" cy="5.5" r="2.5"/><circle cx="18.5" cy="9" r="2.5"/><circle cx="10" cy="18.5" r="2.5"/><path d="M7.8 6.4 16 8.6M17 11.2l-5.6 5.3M7.7 7.6l1.6 8.5"/>
+    </symbol>
+  </defs>
+</svg>
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <svg width="24" height="24"><use href="#i-logo"/></svg>
+      TerraSight <span class="brand-tag">Climate Intelligence</span>
+    </a>
+    <button class="nav-burger" id="nav-burger" aria-label="Toggle navigation">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a>
+      <a href="/dashboard" {% if request.path == '/dashboard' %}class="active"{% endif %}>Command Center</a>
+      <a href="/simulator" {% if request.path == '/simulator' %}class="active"{% endif %}>Simulator</a>
+      <a href="/reports" {% if request.path == '/reports' %}class="active"{% endif %}>Reports</a>
+      <a href="/about" {% if request.path == '/about' %}class="active"{% endif %}>About</a>
+      <a href="/dashboard" class="nav-cta">Run an assessment</a>
+    </div>
+  </div>
+</nav>
+
+<main id="main" class="page">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site">
+  <div class="foot-inner">
+    <div>
+      <a class="brand" href="/" style="margin-bottom:14px">
+        <svg width="22" height="22"><use href="#i-logo"/></svg> TerraSight
+      </a>
+      <p class="muted small" style="margin-top:12px; max-width:44ch">
+        An AI-powered climate and natural disaster intelligence platform.
+        Fifteen hazard modules, live scientific data feeds, explainable machine
+        learning, and decision support for people who have to act on the weather.
+      </p>
+    </div>
+    <div>
+      <h4>Platform</h4>
+      <ul>
+        <li><a href="/dashboard">Command Center</a></li>
+        <li><a href="/module/wildfire">Wildfire Intelligence</a></li>
+        <li><a href="/simulator">Scenario Simulator</a></li>
+        <li><a href="/reports">Executive Reports</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Data partners</h4>
+      <ul>
+        <li><a href="https://www.earthdata.nasa.gov/" rel="noopener" target="_blank">NASA Earthdata</a></li>
+        <li><a href="https://www.weather.gov/" rel="noopener" target="_blank">NOAA / NWS</a></li>
+        <li><a href="https://www.usgs.gov/" rel="noopener" target="_blank">USGS</a></li>
+        <li><a href="https://open-meteo.com/" rel="noopener" target="_blank">Open-Meteo</a></li>
+      </ul>
+    </div>
+    <div class="fine">
+      <span>TerraSight is a decision-support tool, not an official warning source. In an emergency, follow your local authorities.</span>
+      <span>Built by Ronit for research and education.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>window.TS_MODULES = {{ modules | tojson }};</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

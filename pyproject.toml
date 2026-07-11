@@ -6,15 +6,18 @@ authors = ["Ronit Agarwal ronitcodes@gmail.com"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<3.11"
-replit = "^3.2.4"
-Flask = "^2.2.0"
-Flask-Cors = "^3.0.10"
-Flask-SQLAlchemy = "^2.5.1"
-SQLAlchemy = "^1.4.0"
-pandas = "^1.5.3"
-numpy = "^1.24.0"
-scikit-learn = "^1.2.0"
+# keep these in sync with requirements.txt, sklearn especially: the trained
+# model pickles in src/ml/models were saved with scikit-learn 1.7
+python = ">=3.11,<3.13"
+Flask = "^3.1.1"
+Flask-Cors = "^6.0.0"
+Flask-SQLAlchemy = "^3.1.1"
+SQLAlchemy = "^2.0.41"
+pandas = "^2.3.1"
+numpy = "^2.3.1"
+scikit-learn = "^1.7.1"
+requests = "^2.32.4"
+gunicorn = "^23.0.0"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md

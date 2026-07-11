@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Command Center | TerraSight{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="module-hero">
+    <span class="eyebrow">Command Center</span>
+    <h1 style="margin-top: 12px">Global situation, one screen.</h1>
+    <p class="tagline">Search any location to run all fifteen modules against live data,
+    or explore what the planet is doing right now.</p>
+    <div class="searchbox mt-3" style="max-width: 520px">
+      <input class="input" id="loc-search" type="search" autocomplete="off"
+             placeholder="Search a city or place, like Denver or Sacramento..."
+             aria-label="Search for a location">
+    </div>
+  </div>
+
+  <div class="dash">
+    <div class="dash-main">
+      <div class="map-shell">
+        <div id="map" role="application" aria-label="Interactive hazard map"></div>
+        <div class="map-toolbar" id="layer-toolbar"></div>
+      </div>
+      <div class="card" id="matrix-card">
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
+          Multi-hazard risk matrix <span id="matrix-loc" class="muted"></span></div>
+        <div id="matrix-body">
+          <p class="muted small">Pick a location above to run every module. Scores include
+          cross-hazard cascade adjustments; click any row for the full analysis.</p>
+        </div>
+      </div>
+      <div class="card" id="cascade-card" hidden>
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-cascade"/></svg>
+          Active cascade couplings</div>
+        <div id="cascade-body"></div>
+      </div>
+    </div>
+
+    <aside class="dash-side">
+      <div class="card">
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-alert"/></svg>
+          Live natural events <span class="muted">NASA EONET</span></div>
+        <div class="feed" id="feed-events"><div class="skel" style="height: 120px"></div></div>
+      </div>
+      <div class="card">
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-cyclone"/></svg>
+          Tropical cyclones <span class="muted">NOAA NHC</span></div>
+        <div class="feed" id="feed-storms"><div class="skel" style="height: 60px"></div></div>
+      </div>
+      <div class="card">
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-earthquake"/></svg>
+          Significant quakes, 7 days <span class="muted">USGS</span></div>
+        <div class="feed" id="feed-quakes"><div class="skel" style="height: 120px"></div></div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

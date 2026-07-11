@@ -1,0 +1,25 @@
+{
+  "name": "wildfire",
+  "algorithm": "HistGradientBoostingClassifier",
+  "trained_on": "real historical events + ERA5 reanalysis (Open-Meteo archive)",
+  "n_samples": 330,
+  "n_positives": 80,
+  "cv_roc_auc_mean": 0.875,
+  "cv_roc_auc_std": 0.036,
+  "cv_balanced_accuracy": 0.791,
+  "feature_importances": {
+    "gust_max_kmh": 0.099,
+    "dryness_ratio": 0.0622,
+    "rh_min_pct": 0.0473,
+    "days_since_rain": 0.0217,
+    "precip_90d_mm": 0.0123,
+    "tmax_7d_mean": 0.0107,
+    "wind_max_kmh": 0.0063,
+    "tmax_c": 0.0051,
+    "vpd_kpa": 0.003,
+    "et0_7d_mm": 0.0029,
+    "precip_30d_mm": 0.0021,
+    "precip_7d_mm": 0.0005
+  },
+  "trained_at": "2026-07-10"
+}

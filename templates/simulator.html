@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Scenario Simulator | TerraSight{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="module-hero">
+    <span class="eyebrow">Scenario Simulator</span>
+    <h1 style="margin-top: 12px">What happens if the weather changes?</h1>
+    <p class="tagline">Start from real current conditions, then turn the knobs. Every
+    simulatable model reruns instantly, so you can see exactly how sensitive each hazard
+    is to temperature, rain, wind, snow, and ocean heat.</p>
+    <div class="searchbox mt-3" style="max-width: 520px">
+      <input class="input" id="loc-search" type="search" autocomplete="off"
+             placeholder="Search a location to load its real baseline..." aria-label="Search for a location">
+    </div>
+  </div>
+
+  <div class="sim-grid mt-3" id="sim-ui" hidden>
+    <div class="card">
+      <div class="panel-title"><svg width="15" height="15"><use href="#i-sliders"/></svg> Environmental knobs</div>
+      <div class="preset-row">
+        <button class="btn btn-ghost btn-sm" data-preset="heat">Heat dome</button>
+        <button class="btn btn-ghost btn-sm" data-preset="storm">Wet windstorm</button>
+        <button class="btn btn-ghost btn-sm" data-preset="climate2c">+2 C world</button>
+        <button class="btn btn-ghost btn-sm" data-preset="reset">Reset</button>
+      </div>
+      <div id="knobs"></div>
+      <p class="muted small mt-2">Adjustments follow simple physics: evaporative demand
+      rises about 5% per degree, storm fuel (CAPE) about 7% per degree, and drying the
+      rain out lengthens the days-since-rain clock.</p>
+    </div>
+
+    <div class="card">
+      <div class="split">
+        <div class="panel-title">Model response, before and after</div>
+        <span class="spinner-line" id="sim-busy" hidden>rerunning models</span>
+      </div>
+      <div id="sim-results"><div class="spinner-line">Loading the real-conditions baseline. This can take a minute on a fresh location...</div></div>
+      <div class="chart-box mt-3" style="height: 300px"><canvas id="sim-chart" role="img" aria-label="Scenario comparison chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section" id="empty-state">
+    <div class="card pad-lg" style="text-align: center">
+      <svg width="42" height="42" style="color: var(--accent)"><use href="#i-sliders"/></svg>
+      <h3 class="mt-2">Pick a location to load its baseline.</h3>
+      <p class="muted mt-1" style="margin-left: auto; margin-right: auto">The simulator always starts
+      from real observed conditions, so the what-ifs mean something.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+{% endblock %}

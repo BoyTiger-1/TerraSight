@@ -1,0 +1,45 @@
+# real documented US flood events used to train the flood model
+# compiled from NWS storm summaries, FEMA disaster declarations, and USGS flood
+# reports. coordinates mark the hardest-hit community, dates are peak flood days.
+# training features are ERA5 precipitation and moisture history at each point.
+
+# (name, peak_date, lat, lon)
+FLOOD_EVENTS = [
+    ("Hurricane Harvey flooding, Houston TX", "2017-08-27", 29.760, -95.370),
+    ("Houston Tax Day flood", "2016-04-18", 29.760, -95.370),
+    ("Houston Memorial Day flood", "2015-05-25", 29.760, -95.370),
+    ("Ellicott City MD flash flood", "2016-07-30", 39.268, -76.798),
+    ("Ellicott City MD flash flood", "2018-05-27", 39.268, -76.798),
+    ("Baton Rouge LA flood", "2016-08-13", 30.450, -91.150),
+    ("Monroe LA flood", "2016-03-10", 32.510, -92.120),
+    ("Nashville TN flood", "2010-05-02", 36.160, -86.780),
+    ("Boulder CO flood", "2013-09-12", 40.010, -105.270),
+    ("Columbia SC flood", "2015-10-04", 34.000, -81.030),
+    ("White Sulphur Springs WV flood", "2016-06-23", 37.800, -80.300),
+    ("Hurricane Florence, Wilmington NC", "2018-09-15", 34.220, -77.940),
+    ("Hurricane Matthew, Lumberton NC", "2016-10-08", 34.620, -79.010),
+    ("Midwest floods, Omaha NE", "2019-03-15", 41.260, -95.930),
+    ("Hurricane Ida remnants, New York NY", "2021-09-01", 40.710, -74.000),
+    ("Hurricane Ida, LaPlace LA", "2021-08-29", 30.070, -90.480),
+    ("Waverly TN flash flood", "2021-08-21", 36.080, -87.790),
+    ("Yellowstone flood, Gardiner MT", "2022-06-13", 45.030, -110.700),
+    ("Eastern Kentucky flood, Jackson KY", "2022-07-28", 37.380, -83.380),
+    ("St. Louis MO flash flood", "2022-07-26", 38.630, -90.200),
+    ("Death Valley flash flood", "2022-08-05", 36.460, -116.870),
+    ("Montecito CA debris flow", "2018-01-09", 34.440, -119.630),
+    ("Hurricane Ian, Fort Myers FL", "2022-09-28", 26.640, -81.870),
+    ("Fort Lauderdale FL flood", "2023-04-12", 26.120, -80.140),
+    ("Vermont flood, Montpelier VT", "2023-07-10", 44.260, -72.580),
+    ("Hurricane Helene, Asheville NC", "2024-09-27", 35.600, -82.550),
+    ("Pajaro CA levee failure", "2023-03-11", 36.900, -121.750),
+    ("Atmospheric river, Planada CA", "2023-01-09", 37.290, -120.320),
+    ("Midland MI dam failures", "2020-05-19", 43.620, -84.250),
+    ("San Antonio TX flash flood", "2025-06-12", 29.420, -98.490),
+    ("Texas Hill Country flood, Kerrville TX", "2025-07-04", 30.050, -99.140),
+    ("Ruidoso NM post-burn flood", "2024-06-22", 33.330, -105.670),
+    ("Northwest Iowa flood, Rock Valley IA", "2024-06-22", 43.200, -96.300),
+    ("Hurricane Debby, Sarasota FL", "2024-08-05", 27.340, -82.530),
+    ("Hurricane Milton, St. Petersburg FL", "2024-10-09", 27.770, -82.640),
+    ("Kentucky flood, Pikeville KY", "2025-02-15", 37.480, -82.520),
+    ("West Virginia flood, Wheeling WV", "2025-06-14", 40.060, -80.720),
+]

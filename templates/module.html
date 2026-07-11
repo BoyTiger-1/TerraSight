@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.title }} | TerraSight{% endblock %}
+{% block description %}{{ meta.tagline }}. Real data, explainable AI, actionable recommendations.{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="module-hero">
+    <div class="crumbs"><a href="/">TerraSight</a> / <a href="/#modules">modules</a> / {{ slug }}</div>
+    <h1><svg><use href="#i-{{ slug }}"/></svg> {{ meta.title }}</h1>
+    <p class="tagline">{{ meta.tagline }}.</p>
+    <div class="conf-row">
+      <span class="badge kind">{{ meta.kind }}</span>
+      {% if meta.kind == 'impact' %}
+      <span class="badge">honest framing: impact modeling, not event prediction</span>
+      {% endif %}
+      {% if meta.simulatable %}
+      <span class="badge"><a href="/simulator" style="color: inherit">works in the simulator</a></span>
+      {% endif %}
+    </div>
+    <div class="searchbox mt-3" style="max-width: 520px">
+      <input class="input" id="loc-search" type="search" autocomplete="off"
+             placeholder="Search a location to analyze..." aria-label="Search for a location">
+    </div>
+  </div>
+
+  <div id="results" hidden>
+    <div class="assess-grid">
+      <div class="col">
+        <div class="card" style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+          <div class="panel-title" style="align-self: flex-start">Assessment</div>
+          <div class="gauge" id="gauge"></div>
+          <span class="badge" id="level-badge"></span>
+          <div class="conf-row">
+            <span class="badge" id="conf-badge"></span>
+            <span class="badge kind" id="kind-badge"></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="panel-title"><svg width="15" height="15"><use href="#i-alert"/></svg> Impact estimate</div>
+          <div id="impact-body"><p class="muted small">No impact estimate for this assessment.</p></div>
+        </div>
+        <div class="card">
+          <div class="panel-title">Data sources</div>
+          <div id="sources-body" class="small muted"></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card headline-card"><div class="panel-title">Situation</div><span id="headline"></span></div>
+        <div class="card">
+          <div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
+            Why the model thinks so</div>
+          <p class="muted small" style="margin-bottom: 10px">Each bar shows how strongly a
+          variable pushed this score up (warm) or held it down (green).</p>
+          <div id="factors-body"></div>
+        </div>
+        <div class="card" id="timeline-card" hidden>
+          <div class="split">
+            <div class="panel-title" id="timeline-title">Outlook</div>
+            <input type="range" id="timeline-window" min="20" max="100" value="100"
+                   style="width: 140px" title="Zoom the timeline" aria-label="Timeline zoom" hidden>
+          </div>
+          <div class="chart-box"><canvas id="timeline-chart" role="img" aria-label="Timeline chart"></canvas></div>
+        </div>
+        <div class="card" id="cascade-card" hidden>
+          <div class="panel-title"><svg width="15" height="15"><use href="#i-cascade"/></svg> Cascade links</div>
+          <div id="cascade-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2 mt-3">
+      <div class="card">
+        <div class="panel-title">Recommended actions</div>
+        <div id="recs-body"></div>
+      </div>
+      <div class="map-shell"><div class="module-map" id="mod-map" role="application" aria-label="Hazard map"></div></div>
+    </div>
+
+    <div class="mt-3">
+      <details class="methodology">
+        <summary><svg width="15" height="15"><use href="#i-doc"/></svg> Methodology and model card</summary>
+        <div class="body" id="method-body"></div>
+      </details>
+    </div>
+  </div>
+
+  <div id="loading" hidden><div class="card mt-3"><div class="spinner-line">Pulling live data and running the model. First run on a new location takes 10 to 60 seconds...</div></div></div>
+  <div id="error" hidden class="mt-3"></div>
+
+  <div class="section" id="empty-state">
+    <div class="card pad-lg" style="text-align: center">
+      <svg width="42" height="42" style="color: var(--accent)"><use href="#i-{{ slug }}"/></svg>
+      <h3 class="mt-2">Pick a location to begin.</h3>
+      <p class="muted mt-1" style="margin-left: auto; margin-right: auto">This module runs on live data,
+      so every result reflects conditions right now, not a canned demo.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>window.TS_SLUG = {{ slug | tojson }};</script>
+<script src="{{ url_for('static', filename='js/module.js') }}"></script>
+{% endblock %}
