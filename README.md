@@ -4,6 +4,26 @@ TerraSight is an AI-powered decision support system for climate and geophysical 
 
 It is built for the kinds of users who have to act on the weather: residents, researchers, emergency managers, utilities, farmers, insurers, and planners.
 
+![TerraSight homepage](docs/screenshots/home.jpg)
+
+## Screenshots
+
+**Command Center** — a live global disaster map with a density heatmap, filters by disaster type, NASA GIBS science layers, live event feeds, and the run-all risk matrix for any location:
+
+![Command Center dashboard](docs/screenshots/dashboard.jpg)
+
+**Module page** — every module shows a risk gauge, an explainability panel, impact estimate, forecast timeline, a live map, and role-targeted recommendations:
+
+![Wildfire Intelligence module](docs/screenshots/module.jpg)
+
+**Scenario Simulator** — start from real conditions, turn the knobs, and watch every model rerun:
+
+![Scenario Simulator](docs/screenshots/simulator.jpg)
+
+**Executive Report** — a full multi-hazard situation report, print-ready:
+
+![Executive Report](docs/screenshots/report.jpg)
+
 ## Why it exists
 
 Two years ago a wildfire broke out an hour from my community. The air was thick with smoke for days and my family packed bags we hoped we would not need. The LA fires that followed made the lesson permanent. I started with a single wildfire model, then kept going: no hazard exists alone, and nobody should have to interpret a raw risk score during an emergency.
@@ -80,7 +100,7 @@ This regenerates the model files and their model cards, including cross-validate
 ## Pages
 
 - `/` platform homepage with live global event counts
-- `/dashboard` command center: global map with NASA GIBS layers, live EONET, NHC, and USGS feeds, and the run-all risk matrix
+- `/dashboard` command center: live global disaster map with a density heatmap, disaster-type filters, NASA GIBS layers, live EONET, NHC, and USGS feeds, and the run-all risk matrix
 - `/module/<slug>` any of the fifteen module pages, for example `/module/wildfire`
 - `/simulator` scenario simulator
 - `/reports` executive report generator

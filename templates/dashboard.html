@@ -17,10 +17,16 @@
 
   <div class="dash">
     <div class="dash-main">
+      <div class="map-controls">
+        <span class="map-hint"><svg><use href="#i-pin"/></svg>
+          Live disasters worldwide. Click any marker for details, filter by type, or search a place to assess it.</span>
+        <div class="chips" id="type-filters"></div>
+      </div>
       <div class="map-shell">
         <div id="map" role="application" aria-label="Interactive hazard map"></div>
         <div class="map-toolbar" id="layer-toolbar"></div>
       </div>
+      <div class="map-legend" id="map-legend"></div>
       <div class="card" id="matrix-card">
         <div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
           Multi-hazard risk matrix <span id="matrix-loc" class="muted"></span></div>
@@ -58,5 +64,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

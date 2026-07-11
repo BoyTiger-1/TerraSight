@@ -35,6 +35,23 @@ const burger = document.getElementById("nav-burger");
 if (burger) burger.addEventListener("click", () =>
   document.getElementById("nav-links").classList.toggle("open"));
 
+// modules dropdown: click to toggle, click outside or Escape to close
+const navDrop = document.getElementById("nav-modules");
+if (navDrop) {
+  const btn = navDrop.querySelector("button");
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = navDrop.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open);
+  });
+  document.addEventListener("click", (e) => {
+    if (!navDrop.contains(e.target)) { navDrop.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { navDrop.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); }
+  });
+}
+
 // ---------- reveal on scroll ----------
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }

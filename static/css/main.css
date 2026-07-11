@@ -115,6 +115,67 @@ button, input, select { font: inherit; color: inherit; }
 }
 .nav-cta:hover { background: #3fc4ac !important; color: #06231d; }
 
+/* modules mega-dropdown in the nav */
+.nav-drop { position: relative; }
+.nav-drop > button {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+  cursor: pointer; color: var(--ink-2); padding: 8px 13px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; font-family: var(--font-body);
+  transition: color 0.2s, background 0.2s;
+}
+.nav-drop > button:hover, .nav-drop.open > button { color: var(--ink); background: var(--surface-2); }
+.nav-drop > button svg { transition: transform 0.2s; }
+.nav-drop.open > button svg { transform: rotate(180deg); }
+.nav-drop-panel {
+  position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%) translateY(-6px);
+  width: min(620px, 92vw); background: var(--bg-raise); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 12px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+  opacity: 0; visibility: hidden; transition: opacity 0.2s, transform 0.2s; z-index: var(--z-drop);
+}
+.nav-drop.open .nav-drop-panel { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.nav-drop-panel a {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 8px;
+  color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+}
+.nav-drop-panel a:hover { background: var(--accent-dim); color: var(--ink); text-decoration: none; }
+.nav-drop-panel a svg { color: var(--accent); width: 17px; height: 17px; flex-shrink: 0; }
+.nav-drop-panel a .k { font-size: 10.5px; color: var(--ink-3); margin-left: auto; font-family: var(--font-mono); }
+@media (max-width: 840px) {
+  .nav-drop { width: 100%; }
+  .nav-drop > button { width: 100%; justify-content: space-between; }
+  .nav-drop-panel { position: static; transform: none; width: 100%; grid-template-columns: 1fr;
+    box-shadow: none; opacity: 1; visibility: visible; display: none; margin-top: 6px; }
+  .nav-drop.open .nav-drop-panel { display: grid; transform: none; }
+}
+
+/* map controls: filter chips, heatmap toggle, legend */
+.map-controls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 4px 14px; justify-content: space-between;
+}
+.map-hint { color: var(--ink-3); font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
+.map-hint svg { color: var(--accent); width: 15px; height: 15px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+  font-size: 12.5px; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.chip:hover { color: var(--ink); }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.chip.off { opacity: 0.4; }
+.chip.on { border-color: rgba(53, 179, 156, 0.5); color: var(--ink); background: var(--surface-2); }
+.chip.toggle.on { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-dim); }
+
+.map-legend {
+  display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px; margin-top: 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius); background: var(--surface);
+}
+.map-legend .li { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-3); }
+.map-legend .li .sw { width: 10px; height: 10px; border-radius: 50%; }
+.leaflet-container .heat-note { font-size: 11px; }
+
 .nav-burger { display: none; margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--ink-2); cursor: pointer; }
 @media (max-width: 840px) {
   .nav-links { display: none; position: absolute; top: 64px; left: 0; right: 0; background: var(--bg-raise); border-bottom: 1px solid var(--border); flex-direction: column; align-items: stretch; padding: 12px 20px 18px; gap: 2px; }
@@ -247,7 +308,8 @@ table.data td.num { text-align: right; }
 .input::placeholder { color: var(--ink-3); }
 .input:focus { border-color: var(--accent); outline: none; }
 
-.searchbox { position: relative; }
+/* z-index 90 keeps the box (and its dropdown) above the map, below the nav (100) */
+.searchbox { position: relative; z-index: 90; }
 .searchbox .results {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: var(--z-drop);
   background: var(--surface-2); border: 1px solid var(--border);
@@ -398,7 +460,9 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .dash-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 @media (max-width: 1080px) { .dash { grid-template-columns: 1fr; } }
 
-.map-shell { position: relative; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
+/* z-index 1 traps Leaflet's own pane z-indexes inside this box so they cannot
+   paint over the search dropdown, which sits higher in the page stack */
+.map-shell { position: relative; z-index: 1; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
 .map-shell .leaflet-container { background: #0a0e14; }
 #map, .module-map { height: 520px; width: 100%; }
 .module-map { height: 420px; }

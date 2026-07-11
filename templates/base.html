@@ -108,6 +108,17 @@
     <div class="nav-links" id="nav-links">
       <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a>
       <a href="/dashboard" {% if request.path == '/dashboard' %}class="active"{% endif %}>Command Center</a>
+      <div class="nav-drop" id="nav-modules">
+        <button type="button" aria-haspopup="true" aria-expanded="false">
+          Modules
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="nav-drop-panel">
+          {% for slug, m in modules.items() %}
+          <a href="/module/{{ slug }}"><svg><use href="#i-{{ slug }}"/></svg>{{ m.title }}<span class="k">{{ m.kind }}</span></a>
+          {% endfor %}
+        </div>
+      </div>
       <a href="/simulator" {% if request.path == '/simulator' %}class="active"{% endif %}>Simulator</a>
       <a href="/reports" {% if request.path == '/reports' %}class="active"{% endif %}>Reports</a>
       <a href="/about" {% if request.path == '/about' %}class="active"{% endif %}>About</a>
