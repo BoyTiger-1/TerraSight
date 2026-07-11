@@ -69,6 +69,63 @@
   }
 })();
 
+// ---------- homepage motion polish ----------
+// everything here bails out for users who prefer reduced motion
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hover: hover)").matches) {
+
+  // soft glow that trails the cursor, lerped for a weighty feel
+  const glow = document.createElement("div");
+  glow.className = "cursor-glow";
+  document.body.appendChild(glow);
+  let gx = innerWidth / 2, gy = innerHeight / 2, tx = gx, ty = gy;
+  addEventListener("pointermove", (e) => { tx = e.clientX; ty = e.clientY; glow.classList.add("on"); }, { passive: true });
+  (function follow() {
+    gx += (tx - gx) * 0.12; gy += (ty - gy) * 0.12;
+    glow.style.transform = `translate(${gx}px, ${gy}px)`;
+    requestAnimationFrame(follow);
+  })();
+
+  // magnetic hero buttons: nudge toward the cursor when hovered
+  document.querySelectorAll(".hero-ctas .btn").forEach((btn) => {
+    btn.classList.add("magnetic");
+    btn.addEventListener("pointermove", (e) => {
+      const r = btn.getBoundingClientRect();
+      const mx = e.clientX - r.left - r.width / 2;
+      const my = e.clientY - r.top - r.height / 2;
+      btn.style.transform = `translate(${mx * 0.25}px, ${my * 0.35}px)`;
+    });
+    btn.addEventListener("pointerleave", () => { btn.style.transform = ""; });
+  });
+
+  // module cards: cursor spotlight (feeds the CSS --mx/--my) plus a subtle 3D tilt
+  document.querySelectorAll(".mod-card").forEach((card) => {
+    card.addEventListener("pointermove", (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      card.style.setProperty("--mx", `${px * 100}%`);
+      card.style.setProperty("--my", `${py * 100}%`);
+      card.style.transform = `translateY(-4px) rotateX(${(0.5 - py) * 6}deg) rotateY(${(px - 0.5) * 6}deg)`;
+    });
+    card.addEventListener("pointerleave", () => { card.style.transform = ""; });
+  });
+
+  // stagger the bento cards in on scroll instead of all at once
+  document.querySelectorAll(".bento .mod-card").forEach((card, i) => {
+    card.style.transitionDelay = `${(i % 4) * 0.06}s`;
+  });
+
+  // gentle parallax + fade on the hero as it scrolls away
+  const heroInner = document.querySelector(".hero-inner");
+  if (heroInner) {
+    addEventListener("scroll", () => {
+      const y = Math.min(scrollY, 700);
+      heroInner.style.transform = `translateY(${y * 0.18}px)`;
+      heroInner.style.opacity = `${Math.max(1 - y / 620, 0)}`;
+    }, { passive: true });
+  }
+}
+
 // live stats strip fed by the overview endpoint
 (async () => {
   const data = await TS.fetchJSON("/api/live/overview");

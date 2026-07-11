@@ -6,7 +6,7 @@ It is built for the kinds of users who have to act on the weather: residents, re
 
 ## Screenshots
 
-**Command Center** — a live global disaster map with a density heatmap, filters by disaster type, NASA GIBS science layers, live event feeds, and the run-all risk matrix for any location:
+**Command Center** — a live global hazard heatmap (built from worldwide seismicity and active events) you can click anywhere to assess, with disaster-type filters, NASA GIBS science layers, live event feeds, and the run-all risk matrix. Search accepts city names or full street addresses:
 
 ![Command Center dashboard](docs/screenshots/dashboard.jpg)
 
@@ -112,13 +112,15 @@ All endpoints return JSON.
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/geocode?q=denver` | Location search |
+| `GET /api/geocode?q=denver` | Location search, understands both city names and full street addresses |
+| `GET /api/reverse-geocode?lat=..&lon=..` | Turn a clicked map point into a place name |
 | `GET /api/assess/<module>?lat=..&lon=..` | Run one module, for example `/api/assess/wildfire` |
 | `GET /api/assess-all?lat=..&lon=..` | Run all fifteen modules plus cascade coupling |
 | `GET /api/report?lat=..&lon=..` | Full executive report |
 | `GET /api/scenario/knobs` | Available simulator adjustments |
 | `POST /api/scenario/run` | Body `{lat, lon, deltas}`, returns before and after scores |
 | `GET /api/live/overview` | Global live events, storms, and significant quakes |
+| `GET /api/live/heatmap` | Dense worldwide weighted points for the global hazard heatmap |
 | `POST /api/wildfire/predict` | Legacy wildfire endpoint, same contract as the original app, now backed by the real-data model |
 | `POST /api/wildfire/predict-manual` | Legacy manual-input endpoint, kept for backward compatibility |
 

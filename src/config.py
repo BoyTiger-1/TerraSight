@@ -16,6 +16,11 @@ USGS_WATER = "https://waterservices.usgs.gov/nwis/iv/"
 # HANS is the USGS volcano notification system, returns current alert levels
 USGS_VOLCANOES = "https://volcanoes.usgs.gov/hans-public/api/volcano/getMonitoredVolcanoes"
 
+# OpenStreetMap Nominatim handles full street addresses and reverse lookups,
+# which the Open-Meteo geocoder (city names only) cannot
+NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse"
+
 NWS_ALERTS = "https://api.weather.gov/alerts/active"
 NHC_STORMS = "https://www.nhc.noaa.gov/CurrentStorms.json"
 EONET_EVENTS = "https://eonet.gsfc.nasa.gov/api/v3/events"

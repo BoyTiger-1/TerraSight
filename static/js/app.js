@@ -52,6 +52,18 @@ if (navDrop) {
   });
 }
 
+// ---------- scroll progress bar ----------
+const progress = document.createElement("div");
+progress.className = "scroll-progress";
+document.body.appendChild(progress);
+const setProgress = () => {
+  const h = document.documentElement;
+  const max = h.scrollHeight - h.clientHeight;
+  progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+};
+addEventListener("scroll", setProgress, { passive: true });
+setProgress();
+
 // ---------- reveal on scroll ----------
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
