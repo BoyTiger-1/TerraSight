@@ -1,6 +1,6 @@
 # TerraSight, Climate and Natural Disaster Intelligence Platform
 
-TerraSight is an AI-powered decision support system for climate and geophysical hazards. It grew out of a standalone wildfire risk predictor into a full intelligence platform: fifteen hazard modules, live scientific data feeds, machine learning trained on real historical disasters, cross-hazard cascade modeling, a scenario simulator, economic impact analysis, and auto-generated executive reports.
+TerraSight is an AI-powered decision support system for climate and geophysical hazards. It is a full intelligence platform: fifteen hazard modules, live scientific data feeds, machine learning trained on real historical disasters, cross-hazard cascade modeling, a scenario simulator, economic impact analysis, and auto-generated executive reports.
 
 It is built for the kinds of users who have to act on the weather: residents, researchers, emergency managers, utilities, farmers, insurers, and planners.
 
