@@ -21,6 +21,23 @@ def _get(url, params, timeout):
                         headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
 
 
+def _get_retry(url, params, timeout):
+    """one quick retry on a timeout or 5xx, which are usually momentary. we do
+    NOT retry a 429 (rate limit) since that only resets on the hour, and a retry
+    would just waste another request against the limit."""
+    try:
+        resp = _get(url, params, timeout)
+        if resp.status_code < 500:
+            return resp
+    except requests.RequestException:
+        resp = None
+    time.sleep(0.6)
+    try:
+        return _get(url, params, timeout)
+    except requests.RequestException:
+        return resp
+
+
 def fetch_json(url, params=None, ttl=TTL_FORECAST, timeout=20):
     """GET a JSON endpoint with an in-memory TTL cache, returns None on failure"""
     key = (url, tuple(sorted((params or {}).items())))
@@ -30,8 +47,8 @@ def fetch_json(url, params=None, ttl=TTL_FORECAST, timeout=20):
         if hit and now - hit[0] < ttl:
             return hit[1]
     try:
-        resp = _get(url, params, timeout)
-        if resp.status_code != 200:
+        resp = _get_retry(url, params, timeout)
+        if resp is None or resp.status_code != 200:
             return None
         data = resp.json()
     except Exception:

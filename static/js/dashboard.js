@@ -210,8 +210,15 @@ async function assess(loc) {
   if (failed.length) {
     const note = document.createElement("p");
     note.className = "muted small mt-2";
-    note.textContent = `${failed.length} module(s) had no data for this location: ${failed.map(([s]) => s).join(", ")}.`;
+    // these are almost always a momentary feed timeout or the free archive
+    // rate limit, not a real gap in coverage, so say so and offer a retry
+    note.innerHTML = `${failed.length} module(s) couldn't load just now (a live data feed was busy): `
+      + `${failed.map(([s]) => s).join(", ")}. This is usually temporary. `
+      + `<a href="#" id="retry-assess">Retry</a>`;
     matrixBody.appendChild(note);
+    document.getElementById("retry-assess").addEventListener("click", (e) => {
+      e.preventDefault(); assess(loc);
+    });
   }
 
   const activeEdges = (data.edges || []).filter(e => e.active && e.boost > 0);
