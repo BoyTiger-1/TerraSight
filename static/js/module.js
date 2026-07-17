@@ -135,6 +135,11 @@ function render(r, loc) {
   if (!modMap) {
     modMap = TS.makeMap("mod-map", [loc.lat, loc.lon], 7);
     markerLayer = L.layerGroup().addTo(modMap);
+    // click the map to re-run this module at the clicked point
+    TS.enableMapPick(modMap, (picked) => {
+      $("loc-search").value = picked.name || "";
+      run(picked);
+    });
   } else {
     modMap.setView([loc.lat, loc.lon], 7);
     markerLayer.clearLayers();

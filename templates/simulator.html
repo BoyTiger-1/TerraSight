@@ -6,13 +6,15 @@
   <div class="module-hero">
     <span class="eyebrow">Scenario Simulator</span>
     <h1 style="margin-top: 12px">What happens if the weather changes?</h1>
-    <p class="tagline">Start from real current conditions, then turn the knobs. Every
-    simulatable model reruns instantly, so you can see exactly how sensitive each hazard
-    is to temperature, rain, wind, snow, and ocean heat.</p>
+    <p class="tagline">Pick a location and TerraSight loads its real current conditions as
+    a baseline. Then drag the sliders, temperature, rainfall, wind, humidity, snowpack,
+    ocean heat, and every model instantly re-scores so you can see which hazards each
+    change drives. Answer questions like "what if rainfall doubles?" or "what does +2 C do here?"</p>
     <div class="searchbox mt-3" style="max-width: 520px">
       <input class="input" id="loc-search" type="search" autocomplete="off"
-             placeholder="Search a location to load its real baseline..." aria-label="Search for a location">
+             placeholder="Search a city, place, or address to load its baseline..." aria-label="Search for a location">
     </div>
+    <p class="muted small mt-2">Tip: the first load builds the baseline (about 20 to 40 seconds). After that, every slider change updates instantly.</p>
   </div>
 
   <div class="sim-grid mt-3" id="sim-ui" hidden>

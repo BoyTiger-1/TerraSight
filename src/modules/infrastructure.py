@@ -11,6 +11,7 @@ IMPACT_MATRIX = {
     "wildfire":     (0.85,  0.70,  0.40,     0.55,  0.90),
     "flood":        (0.60,  0.90,  0.55,     0.80,  0.75),
     "heatwave":     (0.90,  0.20,  0.75,     0.35,  0.15),
+    "winter":       (0.80,  0.90,  0.55,     0.40,  0.35),
     "tornado":      (0.80,  0.45,  0.50,     0.30,  0.85),
     "cyclone":      (0.95,  0.75,  0.65,     0.60,  0.85),
     "earthquake":   (0.70,  0.80,  0.85,     0.90,  0.90),
@@ -20,8 +21,8 @@ SYSTEMS = ["Power grid", "Transportation", "Hospitals", "Water systems", "Housin
 
 def assess(snap):
     # run the sibling assessments that feed the rollup; import here to dodge cycles
-    from src.modules import wildfire, flood, heatwave, tornado, cyclone, earthquake
-    siblings = {"wildfire": wildfire, "flood": flood, "heatwave": heatwave,
+    from src.modules import wildfire, flood, heatwave, winter, tornado, cyclone, earthquake
+    siblings = {"wildfire": wildfire, "flood": flood, "heatwave": heatwave, "winter": winter,
                 "tornado": tornado, "cyclone": cyclone, "earthquake": earthquake}
     hazard_scores = {}
     for name, mod in siblings.items():

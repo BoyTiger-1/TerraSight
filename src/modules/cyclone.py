@@ -51,6 +51,10 @@ def assess(snap):
         if s.get("lat") is None:
             continue
         d = snap.distance_to(s["lat"], s["lon"])
+        # only a storm within ~2500 km is relevant; beyond that it is a different
+        # basin and naming it in the headline just confuses people
+        if d > 2500:
+            continue
         if nearest is None or d < nearest["distance_km"]:
             nearest = {**s, "distance_km": round(d)}
 

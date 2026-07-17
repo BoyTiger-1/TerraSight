@@ -100,9 +100,29 @@ def apply_deltas(feats, deltas):
     return e
 
 
+# the baseline (real conditions) is expensive to build, but it does not change
+# while a user drags sliders, so cache it per location for 10 minutes. this is
+# what makes the simulator feel instant: only quick() re-scoring runs per drag.
+import time as _time
+_baseline_cache = {}
+
+
+def cached_baseline(snap):
+    key = (round(snap.lat, 3), round(snap.lon, 3))
+    hit = _baseline_cache.get(key)
+    if hit and _time.time() - hit[0] < 600:
+        return hit[1]
+    result = baseline(snap)
+    _baseline_cache[key] = (_time.time(), result)
+    if len(_baseline_cache) > 50:
+        for k in sorted(_baseline_cache, key=lambda k: _baseline_cache[k][0])[:25]:
+            _baseline_cache.pop(k, None)
+    return result
+
+
 def run(snap, deltas):
     """baseline vs modified scores for every simulatable module"""
-    envs, base_scores = baseline(snap)
+    envs, base_scores = cached_baseline(snap)
     if not envs:
         return {"error": "Could not build a baseline for this location."}
 

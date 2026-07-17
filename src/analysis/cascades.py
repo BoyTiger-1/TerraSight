@@ -25,6 +25,8 @@ COUPLINGS = [
     ("flood", "landslide", 0.15, "saturated ground fails on slopes"),
     ("tornado", "infrastructure", 0.20, "tornado tracks sever power corridors"),
     ("avalanche", "infrastructure", 0.10, "slide paths close mountain corridors"),
+    ("winter", "infrastructure", 0.25, "ice loads and snow down lines and close roads"),
+    ("winter", "avalanche", 0.15, "heavy snow loading builds avalanche danger"),
 ]
 
 # a source only propagates once it is meaningfully elevated

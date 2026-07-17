@@ -42,28 +42,38 @@ class EnvSnapshot:
             return len(frame["time"]) - 8  # fall back to the last historical day
 
     def hourly(self):
-        """48h of hourly detail for convective + heat modules"""
+        """48h of hourly detail for convective, heat, and winter modules.
+        pressure-level winds give a real deep-layer shear proxy for tornadoes."""
         return self._memo("hourly", lambda: open_meteo.forecast(
             self.lat, self.lon,
             hourly=["temperature_2m", "apparent_temperature", "relative_humidity_2m",
-                    "precipitation", "wind_speed_10m", "wind_gusts_10m", "cape",
-                    "snow_depth", "soil_moisture_0_to_1cm", "soil_moisture_3_to_9cm",
-                    "freezing_level_height"],
+                    "precipitation", "rain", "snowfall", "wind_speed_10m", "wind_gusts_10m",
+                    "cape", "snow_depth", "soil_moisture_0_to_1cm", "soil_moisture_3_to_9cm",
+                    "freezing_level_height", "wind_speed_850hPa", "wind_speed_500hPa"],
             forecast_days=3, extra={"models": "best_match"}))
 
+    def _coarse(self):
+        """snap to a 0.25 degree (~28 km) grid so a whole metro area reuses one
+        cached climatology call instead of hammering the archive per click.
+        climate normals barely change over that distance."""
+        return round(self.lat * 4) / 4, round(self.lon * 4) / 4
+
     def climatology(self):
-        """30 years of daily tmax/tmin/precip, the baseline for anomalies.
-        one heavier call, cached for a day, shared by heat/drought/climate."""
+        """15 years of daily tmax/tmin/precip, the baseline for anomalies.
+        the archive API is rate-limited and this is its most expensive call, so
+        keep the window modest, snap to a grid, and cache for a day."""
         end = date.today() - timedelta(days=7)
-        start = end.replace(year=end.year - 30)
+        start = end.replace(year=end.year - 15)
+        clat, clon = self._coarse()
         return self._memo("climatology", lambda: open_meteo.archive(
-            self.lat, self.lon, start.isoformat(), end.isoformat(),
+            clat, clon, start.isoformat(), end.isoformat(),
             daily=["temperature_2m_max", "temperature_2m_min", "precipitation_sum"]))
 
     def climate_projection(self):
-        """CMIP6 daily tmax/precip 2025-2050"""
+        """CMIP6 daily tmax/precip 2025-2050, gridded and cached like climatology"""
+        clat, clon = self._coarse()
         return self._memo("projection", lambda: open_meteo.climate(
-            self.lat, self.lon, "2025-01-01", "2050-12-31",
+            clat, clon, "2025-01-01", "2050-12-31",
             daily=["temperature_2m_max", "precipitation_sum"]))
 
     # --- hazard-specific feeds ---

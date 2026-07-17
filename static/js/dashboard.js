@@ -176,7 +176,7 @@ const matrixLoc = document.getElementById("matrix-loc");
 async function assess(loc) {
   TS.saveLocation(loc);
   matrixLoc.textContent = `· ${loc.name}`;
-  matrixBody.innerHTML = `<div class="spinner-line">Running all 15 modules on live data for ${loc.name}. A fresh location takes 20 to 60 seconds while the feeds load...</div>`;
+  matrixBody.innerHTML = `<div class="spinner-line">Running all 16 modules on live data for ${loc.name}. A fresh location takes 20 to 60 seconds while the feeds load...</div>`;
   document.getElementById("cascade-card").hidden = true;
 
   map.flyTo([loc.lat, loc.lon], Math.max(map.getZoom(), 5), { duration: 1.2 });

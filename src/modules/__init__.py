@@ -5,7 +5,7 @@
 from src.modules import (wildfire, flood, drought, air_quality, heatwave,
                          agriculture, climate_trends, infrastructure, cyclone,
                          tornado, tsunami, landslide, avalanche, volcano,
-                         earthquake)
+                         earthquake, winter)
 
 MODULES = {
     "wildfire": {
@@ -32,6 +32,11 @@ MODULES = {
         "title": "Heatwave Intelligence", "kind": "prediction",
         "tagline": "Extreme temperature detection against local 30-year percentile baselines",
         "impl": heatwave, "simulatable": True,
+    },
+    "winter": {
+        "title": "Winter Storm Intelligence", "kind": "prediction",
+        "tagline": "Snowfall, freezing-rain ice risk, dangerous wind chill, and blizzard potential",
+        "impl": winter, "simulatable": True,
     },
     "agriculture": {
         "title": "Agriculture Intelligence", "kind": "prediction",

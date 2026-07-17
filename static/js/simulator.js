@@ -1,7 +1,7 @@
 // scenario simulator: load a real baseline, expose sliders for the knobs the
 // backend understands, debounce reruns, and chart before vs after
 
-let loc = null, knobsMeta = null, chart = null, timer = null;
+let loc = null, knobsMeta = null, chart = null, timer = null, firstLoad = true;
 
 const $ = (id) => document.getElementById(id);
 
@@ -14,10 +14,11 @@ const PRESETS = {
 
 async function loadBaseline(picked) {
   loc = picked;
+  firstLoad = true;
   TS.saveLocation(picked);
   $("empty-state").hidden = true;
   $("sim-ui").hidden = false;
-  $("sim-results").innerHTML = `<div class="spinner-line">Loading the real-conditions baseline. This can take a minute on a fresh location...</div>`;
+  $("sim-results").innerHTML = `<div class="spinner-line">Building the real-conditions baseline for ${picked.name}. First load takes about 20 to 40 seconds while live data comes in, then every slider is instant...</div>`;
   if (!knobsMeta) {
     knobsMeta = await TS.fetchJSON("/api/scenario/knobs");
     buildKnobs();
@@ -66,13 +67,21 @@ function currentDeltas() {
 
 async function rerun() {
   if (!loc) return;
-  $("sim-busy").hidden = false;
+  const busy = $("sim-busy");
+  busy.textContent = firstLoad ? "building baseline" : "updating";
+  busy.hidden = false;
   const name = `${loc.name}${loc.admin1 ? ", " + loc.admin1 : ""}`;
-  const data = await TS.fetchJSON("/api/scenario/run", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lat: loc.lat, lon: loc.lon, name, deltas: currentDeltas() }),
-  });
-  $("sim-busy").hidden = true;
+  let data;
+  try {
+    data = await TS.fetchJSON("/api/scenario/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat: loc.lat, lon: loc.lon, name, deltas: currentDeltas() }),
+    });
+  } catch (e) {
+    data = { error: "Could not reach the server. Check your connection and try again." };
+  }
+  busy.hidden = true;   // always clears, even on error
+  firstLoad = false;
   if (data.error) {
     $("sim-results").innerHTML = `<div class="error-note">${data.error}</div>`;
     return;

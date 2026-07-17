@@ -267,10 +267,27 @@ TS.gibsLayer = (key) => {
 TS.makeMap = (id, center = [39, -98], zoom = 4) => {
   const map = L.map(id, { zoomControl: true, attributionControl: true, worldCopyJump: true })
     .setView(center, zoom);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19, attribution: "&copy; OpenStreetMap &copy; CARTO",
   }).addTo(map);
+  // Esri World Imagery is free and keyless, gives a proper satellite basemap
+  const satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics" });
+  L.control.layers({ "Dark": dark, "Satellite": satellite }, null,
+                   { position: "topleft", collapsed: true }).addTo(map);
   return map;
+};
+
+// wire a map so clicking it reverse-geocodes the point and calls onPick(loc).
+// used by the command center and module pages for "click anywhere to assess".
+TS.enableMapPick = (map, onPick) => {
+  map.on("click", async (e) => {
+    const { lat, lng } = e.latlng;
+    const loc = await TS.fetchJSON(`/api/reverse-geocode?lat=${lat}&lon=${lng}`);
+    onPick({ name: (loc && loc.name) || `${lat.toFixed(2)}, ${lng.toFixed(2)}`,
+             lat, lon: lng, admin1: loc && loc.admin1 });
+  });
 };
 
 // small colored dot markers per hazard kind

@@ -35,6 +35,14 @@ def alerts_matching(alerts, keywords):
     return hits
 
 
+def _num(v):
+    """NHC returns most numbers as strings ("55"), coerce to float or None"""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def active_storms():
     """tropical cyclones the NHC is currently tracking in the Atlantic + East Pacific"""
     data = fetch_json(config.NHC_STORMS, ttl=TTL_LIVE, timeout=25)
@@ -43,10 +51,10 @@ def active_storms():
         storms.append({
             "id": s.get("id"), "name": s.get("name"),
             "classification": s.get("classification"),
-            "intensity_kt": s.get("intensity"),  # sustained wind in knots
-            "pressure_mb": s.get("pressure"),
-            "lat": s.get("latitudeNumeric"), "lon": s.get("longitudeNumeric"),
-            "movement_dir": s.get("movementDir"), "movement_speed_kt": s.get("movementSpeed"),
+            "intensity_kt": _num(s.get("intensity")),  # sustained wind in knots
+            "pressure_mb": _num(s.get("pressure")),
+            "lat": _num(s.get("latitudeNumeric")), "lon": _num(s.get("longitudeNumeric")),
+            "movement_dir": s.get("movementDir"), "movement_speed_kt": _num(s.get("movementSpeed")),
             "last_update": s.get("lastUpdate"), "basin": s.get("binNumber"),
         })
     return storms

@@ -27,16 +27,30 @@ def _trend(xs, ys):
     return num / den * 10
 
 
+def _unavailable(snap):
+    """soft result when the ERA5 archive is temporarily rate-limited, so the
+    module still appears (honestly) instead of failing the whole assessment"""
+    return base.result(
+        "climate-trends", snap, 0.0, kind="monitoring", confidence=0.2,
+        headline=("Long-term climate trend is temporarily unavailable: the ERA5 archive "
+                  "is rate-limited right now. Everything else assessed normally; try this "
+                  "module again in a few minutes."),
+        factors=[], sources=["Open-Meteo ERA5 archive (rate-limited)"],
+        methodology=("This module needs 15 years of daily reanalysis to fit a local "
+                     "warming trend. The free archive API has an hourly request limit; "
+                     "when it is exhausted the trend cannot be computed until it resets."))
+
+
 def assess(snap):
     clim = snap.climatology()
     daily = (clim or {}).get("daily") or {}
     if not daily.get("time"):
-        return {"error": "Historical climate data unavailable for this location."}
+        return _unavailable(snap)
 
     annual = _annual_means(daily["time"], daily["temperature_2m_max"], daily["temperature_2m_min"])
     years = sorted(annual.keys())
     if len(years) < 10:
-        return {"error": "Not enough complete years in the archive here."}
+        return _unavailable(snap)
 
     xs = [int(y) for y in years]
     ys = [annual[y] for y in years]

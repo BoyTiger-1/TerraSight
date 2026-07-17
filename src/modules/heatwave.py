@@ -53,8 +53,11 @@ def assess(snap):
 
     dist = _seasonal_tmax_distribution(snap.climatology())
     p90, p975 = _pct(dist, 0.90), _pct(dist, 0.975)
-    if p90 is None:
-        return {"error": "Could not build a temperature baseline for this location."}
+    # if the 30-year baseline is unavailable (archive rate-limited), fall back to
+    # absolute heat-health thresholds so the module still works everywhere
+    baseline_ok = p90 is not None
+    if not baseline_ok:
+        p90, p975 = 32.0, 40.0  # ~90F onset, ~104F severe, NWS heat-health range
 
     fut_days = frame["time"][idx:idx + 7]
     fut_tmax = [v for v in frame["tmax"][idx:idx + 7]]
@@ -84,9 +87,11 @@ def assess(snap):
     fut_tmin = [v for v in frame["tmin"][idx:idx + 7] if v is not None]
     warm_nights = sum(1 for v in fut_tmin if v >= 21)
 
+    baseline_label = (f"local 90th percentile for this season is {p90:.1f} C" if baseline_ok
+                      else f"absolute heat-health threshold {p90:.0f} C (local baseline unavailable)")
     factors = [
         base.factor("Forecast peak temperature", round(peak, 1) if peak else None, "C",
-                    exceed * 0.7, f"local 90th percentile for this season is {p90:.1f} C"),
+                    exceed * 0.7, baseline_label),
         base.factor("Days at or above p90", hot_days, f"of next {len(fut_days)}",
                     streak * 0.3, "three or more consecutive days is a heatwave"),
         base.factor("Longest hot streak", best_run, "days", base.scale(best_run, 0, 5) * 0.2, ""),
@@ -100,27 +105,30 @@ def assess(snap):
         factors.insert(0, base.factor("NWS heat alert", alerts[0].get("event"), "", 0.35,
                                       alerts[0].get("headline") or ""))
 
+    ref = "the local 90th percentile" if baseline_ok else "the heat-health threshold"
     headline = (f"Peak of {peak:.0f} C expected" if peak else "Temperatures near normal")
     if hot_days:
-        headline += f", {hot_days} day(s) above the local 90th percentile ({p90:.0f} C)"
+        headline += f", {hot_days} day(s) above {ref} ({p90:.0f} C)"
     headline += ". " + (alerts[0]["event"] + " in effect." if alerts else
                         "No NWS heat products in effect.")
 
     return base.result(
         "heatwave", snap, score, headline=headline,
-        confidence=0.9 if dist else 0.5,
+        confidence=0.9 if baseline_ok else 0.55,
         factors=factors,
         features={"tmax_c": peak, "tmax_p90": p90, "tmax_p975": p975, "hot_days": hot_days},
         timeline={"labels": fut_days, "series": [
             {"name": "Forecast max temp", "data": [round(v, 1) if v is not None else None for v in fut_tmax], "unit": "C"},
-            {"name": "Local p90 baseline", "data": [round(p90, 1)] * len(fut_days), "unit": "C"}]},
+            {"name": ("Local p90 baseline" if baseline_ok else "Heat-health threshold"), "data": [round(p90, 1)] * len(fut_days), "unit": "C"}]},
         map_layers={"gibs": ["temp"]},
         recommendations=_recommendations(score, warm_nights),
         impact=economics.estimate("heatwave", snap.lat, snap.lon, score, radius_km=60),
-        sources=["Open-Meteo forecast", "Open-Meteo ERA5 archive (30-year baseline)", "NOAA NWS alerts"],
-        methodology=("Forecast maxima ranked against a 30-year same-season ERA5 "
-                     "distribution at this exact location. Score combines percentile "
-                     "exceedance with heatwave persistence, escalated by live NWS products."))
+        sources=["Open-Meteo forecast", "Open-Meteo ERA5 archive (15-year baseline)", "NOAA NWS alerts"],
+        methodology=("Forecast maxima ranked against a 15-year same-season ERA5 "
+                     "distribution at this location. Score combines percentile exceedance "
+                     "with heatwave persistence, escalated by live NWS products. When the "
+                     "archive baseline is temporarily unavailable, absolute heat-health "
+                     "thresholds are used instead at reduced confidence."))
 
 
 def _recommendations(score, warm_nights):

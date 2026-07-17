@@ -5,11 +5,23 @@ from src.modules import base
 from src.services import noaa
 
 
+# tornadoes need instability AND deep-layer shear together. this is the idea
+# behind SPC's supercell composite: high CAPE with weak shear gives disorganized
+# airmass storms, strong shear with no CAPE gives nothing, both gives supercells.
+def _score(cape_max, shear_kmh, gust_max, rh_mean):
+    cape_f = base.scale(cape_max, 500, 3500)
+    shear_f = base.scale(shear_kmh, 30, 90)          # ~16 to 49 kt bulk shear
+    supercell = cape_f * shear_f                       # the both-ingredients term
+    gust_f = base.scale(gust_max, 40, 110)
+    rh_f = base.scale(rh_mean if rh_mean is not None else 30, 35, 80)
+    score = (cape_f * 0.28 + shear_f * 0.28 + supercell * 0.29 + gust_f * 0.08 + rh_f * 0.07) * 100
+    return score, cape_f, shear_f, supercell, gust_f, rh_f
+
+
 def quick(env):
-    cape_f = base.scale(env.get("cape", 0), 500, 3500)
-    gust_f = base.scale(env.get("gust_max_kmh", 0), 40, 110)
-    rh_f = base.scale(env.get("rh_min_pct", 30), 35, 75)
-    return round((cape_f * 0.5 + gust_f * 0.3 + rh_f * 0.2) * 100, 1)
+    score, *_ = _score(env.get("cape", 0), env.get("shear_kmh", 0),
+                       env.get("gust_max_kmh", 0), env.get("rh_min_pct", 30))
+    return round(score, 1)
 
 
 def assess(snap):
@@ -22,19 +34,21 @@ def assess(snap):
         return {"error": "Convective forecast data unavailable for this location."}
 
     cape_max = max((v for v in cape_series if v is not None), default=0)
-    # find when instability peaks so the headline can say "this evening"
     peak_i = max(range(len(cape_series)),
                  key=lambda i: cape_series[i] if cape_series[i] is not None else -1)
     gust_max = max((v for v in gust_series if v is not None), default=0)
-    rh_mean = None
     rh_vals = [v for v in rh_series if v is not None]
-    if rh_vals:
-        rh_mean = sum(rh_vals) / len(rh_vals)
+    rh_mean = sum(rh_vals) / len(rh_vals) if rh_vals else None
 
-    cape_f = base.scale(cape_max, 500, 3500)
-    gust_f = base.scale(gust_max, 40, 110)
-    rh_f = base.scale(rh_mean or 30, 35, 75)
-    score = (cape_f * 0.5 + gust_f * 0.3 + rh_f * 0.2) * 100
+    # deep-layer shear proxy: 500 hPa minus 850 hPa wind speed, biggest during
+    # the unstable window. a real difference of vectors would be ideal, but the
+    # speed difference tracks it well enough to separate sheared from calm setups
+    v850 = hourly.get("wind_speed_850hPa", [])
+    v500 = hourly.get("wind_speed_500hPa", [])
+    shear_vals = [abs(b - a) for a, b in zip(v850, v500) if a is not None and b is not None]
+    shear_kmh = max(shear_vals) if shear_vals else 0
+
+    score, cape_f, shear_f, supercell, gust_f, rh_f = _score(cape_max, shear_kmh, gust_max, rh_mean)
 
     # live NWS products override the ingredients-based estimate
     alerts = snap.alerts()
@@ -49,12 +63,16 @@ def assess(snap):
         score = max(score, 55)
 
     factors = [
-        base.factor("Peak CAPE, 48h", round(cape_max), "J/kg", cape_f * 0.5,
+        base.factor("Peak CAPE, 48h", round(cape_max), "J/kg", cape_f * 0.28,
                     "convective fuel: 1000 is unstable, 3000+ is volatile"),
-        base.factor("Peak wind gusts", round(gust_max), "km/h", gust_f * 0.3,
-                    "strong gusts suggest organized storm dynamics"),
+        base.factor("Deep-layer wind shear", round(shear_kmh), "km/h", shear_f * 0.28,
+                    "500 vs 850 hPa winds, organizes storms into rotating supercells"),
+        base.factor("Supercell setup (CAPE x shear)", round(supercell * 100), "%", supercell * 0.29,
+                    "tornadoes need both ingredients at once, not either alone"),
+        base.factor("Peak wind gusts", round(gust_max), "km/h", gust_f * 0.08,
+                    "surface gust potential"),
         base.factor("Mean low-level humidity", round(rh_mean) if rh_mean else None, "%",
-                    rh_f * 0.2, "moist boundary layer feeds updrafts"),
+                    rh_f * 0.07, "moist boundary layer feeds updrafts"),
     ]
     if tor_warn:
         factors.insert(0, base.factor("TORNADO WARNING", "ACTIVE", "", 1.0,
@@ -76,26 +94,30 @@ def assess(snap):
     elif tor_watch:
         headline = f"Tornado watch in effect. Peak CAPE {cape_max:.0f} J/kg in the next 48 hours."
     else:
-        level = "volatile" if cape_max > 2500 else "unstable" if cape_max > 1000 else "stable"
-        headline = (f"Atmosphere is {level}: peak CAPE {cape_max:.0f} J/kg"
-                    + (f" around {times[peak_i][11:16]} on {times[peak_i][:10]}" if cape_max > 500 else "")
-                    + f", gusts to {gust_max:.0f} km/h.")
+        both = supercell > 0.25
+        headline = (f"Supercell setup: CAPE {cape_max:.0f} J/kg with {shear_kmh:.0f} km/h deep-layer shear"
+                    if both else
+                    (f"Unstable but weakly sheared: CAPE {cape_max:.0f} J/kg, shear only {shear_kmh:.0f} km/h"
+                     if cape_max > 1000 else
+                     f"Stable atmosphere: CAPE {cape_max:.0f} J/kg, shear {shear_kmh:.0f} km/h"))
+        headline += (f", peaking {times[peak_i][11:16]} on {times[peak_i][:10]}." if cape_max > 500 else ".")
 
     return base.result(
         "tornado", snap, score, headline=headline,
         confidence=0.9 if (tor_warn or tor_watch) else 0.65,
         factors=factors,
-        features={"cape": cape_max, "gust_max_kmh": gust_max, "rh_min_pct": rh_mean},
+        features={"cape": cape_max, "shear_kmh": shear_kmh, "gust_max_kmh": gust_max, "rh_min_pct": rh_mean},
         timeline=timeline,
         map_layers={"gibs": ["clouds"]},
         recommendations=_recommendations(score, bool(tor_warn), bool(tor_watch)),
         impact=economics.estimate("tornado", snap.lat, snap.lon, score, radius_km=30),
-        sources=["Open-Meteo forecast (CAPE, gusts)", "NOAA NWS alerts"],
-        methodology=("Ingredients-based convective assessment from model CAPE, gusts, "
-                     "and boundary-layer moisture, overridden by live NWS tornado "
-                     "watches and warnings. Tornadogenesis cannot be predicted point-wise; "
-                     "this module quantifies environment favorability, exactly as SPC "
-                     "outlooks do."))
+        sources=["Open-Meteo forecast (CAPE, pressure-level winds, gusts)", "NOAA NWS alerts"],
+        methodology=("Ingredients-based convective assessment combining model CAPE with a "
+                     "deep-layer wind shear proxy (500 minus 850 hPa winds), following the "
+                     "logic of SPC's supercell composite: tornadoes require instability and "
+                     "shear together. Overridden by live NWS tornado watches and warnings. "
+                     "Tornadogenesis cannot be predicted point-wise; this quantifies "
+                     "environment favorability."))
 
 
 def _recommendations(score, warning, watch):
