@@ -40,6 +40,10 @@
         <div class="why">Earthquakes and eruptions cannot be predicted. Those modules model impact and readiness instead, and say so on the page.</div></div>
       <div class="rec advisory"><div class="act">Physics beats overfitting.</div>
         <div class="why">The ML models are monotonically constrained: more wind can never mean less fire, more rain can never mean more drought.</div></div>
+      <div class="rec advisory"><div class="act">Show your work, including the failures.</div>
+        <div class="why">The <a href="/validation">validation page</a> publishes cross-validated ROC and precision-recall curves, calibration diagrams, the confusion matrix at the cutoff the product actually uses, and the twelve events each model got most wrong. A model nobody has audited is an opinion with decimal places.</div></div>
+      <div class="rec advisory"><div class="act">Never "no data available".</div>
+        <div class="why">Some feeds genuinely do not exist at every point on earth: a river gauge needs a river, sea surface temperature needs ocean. So each feed walks outward until it finds a real reading, a throttled API serves its last good response instead of an empty panel, and any substitution is labelled with the distance it came from rather than passed off as local.</div></div>
     </div>
   </div>
 
@@ -51,7 +55,11 @@
         <tr><td>Machine learning</td><td>Gradient-boosted classifiers (scikit-learn) trained on 80 documented US wildfires and 37 US floods with ERA5 features, monotonic physics constraints, occlusion-based local explanations</td></tr>
         <tr><td>Science models</td><td>SPI-style drought ranking, percentile heatwave detection, Caine intensity-duration landslide thresholds, Gutenberg-Richter seismicity, Omori aftershock decay, Rankine cyclone wind decay, FAO-56 water balance</td></tr>
         <tr><td>Data feeds</td><td>Open-Meteo (forecast, ERA5 archive, air quality, GloFAS flood, CMIP6, marine, elevation), USGS (earthquakes, river gauges, volcanoes), NOAA (NWS alerts, NHC storms), NASA (EONET, GIBS, FIRMS)</td></tr>
-        <tr><td>Backend</td><td>Python, Flask, cached data layer, 15 module engines plus cascade, scenario, report, and economics services</td></tr>
+        <tr><td>National pipeline</td><td>A land-masked grid of roughly 800 points covering all 50 states, DC, and Puerto Rico, fetched in bulk multi-coordinate requests, scored by the same models the module pages use, and refreshed on a budget-aware schedule so the hazard field covers the whole country rather than only where an event was reported</td></tr>
+        <tr><td>Seven day outlook</td><td>Every grid point is scored on each of the next seven days, not just today, so the national map animates forward through the week. The forecast window each lead day sees is held fixed, otherwise the map would appear to calm down at the end of the week purely because the forecast ran out</td></tr>
+        <tr><td>Watchlist and alerts</td><td>Saved locations are checked against the grid's week-ahead peak rather than only today's score, and a national feed diffs consecutive builds to report what crossed a risk band. The watchlist lives in the browser, so there are no accounts and nothing about who is watching what is stored on the server</td></tr>
+        <tr><td>Validation</td><td>Out-of-fold cross-validation over the persisted training rows: ROC, precision-recall, reliability diagrams, Brier skill against the base rate, and the full threshold tradeoff table, regenerated on every retrain</td></tr>
+        <tr><td>Backend</td><td>Python, Flask, cached data layer with stale-while-error fallback, 16 module engines plus cascade, scenario, report, and economics services</td></tr>
         <tr><td>Frontend</td><td>Vanilla JavaScript, Leaflet with NASA GIBS satellite layers, Chart.js, a single design system</td></tr>
       </tbody>
     </table></div>
@@ -59,7 +67,7 @@
 
   <div class="card pad-lg mt-3" style="text-align: center">
     <h3>The wildfire module that started it all is still here.</h3>
-    <p class="muted mt-1" style="margin-left: auto; margin-right: auto">Now trained on real fires instead of synthetic data, and surrounded by fourteen siblings.</p>
+    <p class="muted mt-1" style="margin-left: auto; margin-right: auto">Now trained on real fires instead of synthetic data, and surrounded by fifteen siblings.</p>
     <div class="hero-ctas" style="justify-content: center">
       <a class="btn btn-primary" href="/module/wildfire">Open Wildfire Intelligence <svg width="16" height="16"><use href="#i-arrow"/></svg></a>
     </div>

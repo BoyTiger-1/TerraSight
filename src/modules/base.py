@@ -30,6 +30,10 @@ def result(module, snap, score, headline, kind="prediction", confidence=0.75,
         "impact": impact,
         "data_sources": sources or [],
         "methodology": methodology,
+        # which feeds answered at this exact point and which fell back to the
+        # nearest place that had coverage. the UI turns this into a chip so a
+        # substituted reading is always visible rather than silently assumed.
+        "data_provenance": getattr(snap, "coverage", lambda: {})(),
     }
     if extras:
         out.update(extras)

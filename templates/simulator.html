@@ -7,9 +7,11 @@
     <span class="eyebrow">Scenario Simulator</span>
     <h1 style="margin-top: 12px">What happens if the weather changes?</h1>
     <p class="tagline">Pick a location and TerraSight loads its real current conditions as
-    a baseline. Then drag the sliders, temperature, rainfall, wind, humidity, snowpack,
-    ocean heat, and every model instantly re-scores so you can see which hazards each
-    change drives. Answer questions like "what if rainfall doubles?" or "what does +2 C do here?"</p>
+    a baseline. Then drag the sliders, temperature, rainfall, wind, humidity, soil moisture,
+    instability, snowpack, ocean heat, and every model instantly re-scores. Beyond the
+    straight before-and-after, you can rank which variable this place is most exposed to,
+    plot the full response curve of any model, and solve for exactly how far a variable has
+    to move before a hazard crosses into High or Extreme.</p>
     <div class="searchbox mt-3" style="max-width: 520px">
       <input class="input" id="loc-search" type="search" autocomplete="off"
              placeholder="Search a city, place, or address to load its baseline..." aria-label="Search for a location">
@@ -20,25 +22,67 @@
   <div class="sim-grid mt-3" id="sim-ui" hidden>
     <div class="card">
       <div class="panel-title"><svg width="15" height="15"><use href="#i-sliders"/></svg> Environmental knobs</div>
-      <div class="preset-row">
-        <button class="btn btn-ghost btn-sm" data-preset="heat">Heat dome</button>
-        <button class="btn btn-ghost btn-sm" data-preset="storm">Wet windstorm</button>
-        <button class="btn btn-ghost btn-sm" data-preset="climate2c">+2 C world</button>
-        <button class="btn btn-ghost btn-sm" data-preset="reset">Reset</button>
-      </div>
+      <div class="preset-row" id="preset-row"></div>
       <div id="knobs"></div>
       <p class="muted small mt-2">Adjustments follow simple physics: evaporative demand
-      rises about 5% per degree, storm fuel (CAPE) about 7% per degree, and drying the
-      rain out lengthens the days-since-rain clock.</p>
+      rises about 5% per degree, storm fuel (CAPE) about 7% per degree, drying the rain out
+      lengthens the days-since-rain clock, and warming a scenario past freezing removes its
+      ice hours. Climatological baselines such as the local 90th-percentile heat threshold
+      stay fixed, which is exactly what makes the comparison a what-if.</p>
+      <div class="preset-row mt-2" style="margin-bottom: 0">
+        <button class="btn btn-ghost btn-sm" id="btn-share">Share this scenario</button>
+        <button class="btn btn-ghost btn-sm" id="btn-csv">Export CSV</button>
+      </div>
     </div>
 
-    <div class="card">
+    <div>
       <div class="split">
-        <div class="panel-title">Model response, before and after</div>
+        <div class="seg" id="sim-tabs">
+          <button data-tab="impact" class="on">Impact</button>
+          <button data-tab="sensitivity">Sensitivity</button>
+          <button data-tab="response">Response curve</button>
+          <button data-tab="breaking">Breaking point</button>
+        </div>
         <span class="spinner-line" id="sim-busy" hidden>rerunning models</span>
       </div>
-      <div id="sim-results"><div class="spinner-line">Loading the real-conditions baseline. This can take a minute on a fresh location...</div></div>
-      <div class="chart-box mt-3" style="height: 300px"><canvas id="sim-chart" role="img" aria-label="Scenario comparison chart"></canvas></div>
+
+      <div class="card mt-2" data-pane="impact">
+        <div class="panel-title">Model response, before and after</div>
+        <div id="sim-results"><div class="spinner-line">Loading the real-conditions baseline. This can take a minute on a fresh location...</div></div>
+        <div id="cascade-box"></div>
+        <div class="chart-box mt-3" style="height: 300px"><canvas id="sim-chart" role="img" aria-label="Scenario comparison chart"></canvas></div>
+      </div>
+
+      <div class="card mt-2" data-pane="sensitivity" hidden>
+        <div class="panel-title">What is this location actually exposed to?</div>
+        <div id="sens-body"></div>
+      </div>
+
+      <div class="card mt-2" data-pane="response" hidden>
+        <div class="panel-title">Response curve</div>
+        <div class="field-row">
+          <label class="muted small" for="sweep-knob">Sweep</label>
+          <select class="input" id="sweep-knob" style="max-width: 260px"></select>
+        </div>
+        <div class="chart-box" style="height: 340px"><canvas id="sweep-chart" role="img" aria-label="Model response curve"></canvas></div>
+        <p class="muted small mt-2" id="sweep-note"></p>
+      </div>
+
+      <div class="card mt-2" data-pane="breaking" hidden>
+        <div class="panel-title">How far would it have to move?</div>
+        <div class="field-row">
+          <label class="muted small" for="thr-module">How much</label>
+          <select class="input" id="thr-knob" style="max-width: 220px"></select>
+          <label class="muted small" for="thr-module">would push</label>
+          <select class="input" id="thr-module" style="max-width: 220px"></select>
+          <label class="muted small" for="thr-target">to</label>
+          <select class="input" id="thr-target" style="max-width: 150px"></select>
+        </div>
+        <div class="answer-box" id="thr-answer"></div>
+        <p class="muted small mt-2">Solved by bisection against the same trained models the
+        module pages use, with every other slider held where you left it. If a hazard cannot
+        reach the band anywhere in the slider's range, it says so rather than guessing.</p>
+      </div>
     </div>
   </div>
 

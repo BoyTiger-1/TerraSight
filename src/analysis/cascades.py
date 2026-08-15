@@ -1,8 +1,6 @@
 # the cascade engine: disasters are coupled systems, not isolated scores.
 # each edge below is a documented physical mechanism. when a source hazard is
 # elevated, it pushes the target hazard's score up through the listed weight.
-from src.modules import MODULES
-
 # (source, target, weight, mechanism)
 COUPLINGS = [
     ("drought", "wildfire", 0.20, "drought cures vegetation into fuel"),
@@ -53,13 +51,8 @@ def apply(scores):
 
 def run_all(snap):
     """run every module against one shared snapshot, then couple the scores"""
-    results = {}
-    for slug, meta in MODULES.items():
-        try:
-            r = meta["impl"].assess(snap)
-        except Exception as e:
-            r = {"error": f"{type(e).__name__}: {e}"}
-        results[slug] = r
+    from src.modules import runner
+    results = runner.assess_all(snap)
 
     base_scores = {slug: r["assessment"]["score"]
                    for slug, r in results.items() if "error" not in r}

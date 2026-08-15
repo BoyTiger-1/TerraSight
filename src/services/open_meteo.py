@@ -43,6 +43,39 @@ def forecast(lat, lon, hourly=None, daily=None, past_days=0, forecast_days=7, ex
     return fetch_json(config.OPEN_METEO_FORECAST, params, ttl=TTL_FORECAST)
 
 
+def forecast_multi(points, daily=None, hourly=None, past_days=0, forecast_days=7,
+                   timeout=90):
+    """same as forecast() but for many coordinates in one request.
+
+    Open-Meteo accepts comma-separated latitude/longitude lists and answers with
+    a JSON array in the same order. this is what makes a national grid feasible:
+    800 points cost about a dozen HTTP requests instead of 800.
+
+    returns a list aligned with `points`, with None where a slot is missing."""
+    if not points:
+        return []
+    params = {
+        "latitude": ",".join(str(round(p[0], 4)) for p in points),
+        "longitude": ",".join(str(round(p[1], 4)) for p in points),
+        "timezone": "UTC", "forecast_days": forecast_days,
+    }
+    if past_days:
+        params["past_days"] = past_days
+    if daily:
+        params["daily"] = ",".join(daily)
+    if hourly:
+        params["hourly"] = ",".join(hourly)
+    data = fetch_json(config.OPEN_METEO_FORECAST, params, ttl=TTL_FORECAST, timeout=timeout)
+    if data is None:
+        return [None] * len(points)
+    # a single-coordinate request comes back as an object, not a list
+    if isinstance(data, dict):
+        data = [data]
+    if len(data) < len(points):
+        data = list(data) + [None] * (len(points) - len(data))
+    return data[:len(points)]
+
+
 def archive(lat, lon, start_date, end_date, daily=None, hourly=None):
     """ERA5 reanalysis back to 1940, this is real observed-assimilated data"""
     params = {

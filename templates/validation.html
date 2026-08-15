@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Model Validation | TerraSight{% endblock %}
+{% block description %}Cross-validated performance of TerraSight's trained wildfire and flood
+models: ROC and precision-recall curves, calibration, Brier skill, and the confusion matrix at
+the threshold the product actually uses.{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="module-hero">
+    <span class="eyebrow">Model validation</span>
+    <h1 style="margin-top: 12px">Does it actually work?</h1>
+    <p class="tagline">Every risk score on this platform comes from a model, and a model that
+    nobody has audited is just an opinion with decimal places. This page is the audit. Every
+    number below comes from <strong>out-of-fold cross-validation</strong>: the data is split
+    five ways, and each row is scored by a model that never saw it during training, so nothing
+    here is the model grading its own homework.</p>
+    <p class="tagline">Two questions matter, and they are different. <strong>Discrimination</strong>
+    asks whether the model ranks a real event above a quiet day. <strong>Calibration</strong>
+    asks whether a 70 means seventy percent. A model can be excellent at the first and useless
+    at the second, and only the second makes the number safe to read literally.</p>
+  </div>
+
+  <div id="validation-body">
+    <div class="card"><div class="spinner-line">Loading the validation report...</div></div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="panel-title"><svg width="15" height="15"><use href="#i-doc"/></svg>
+      How to read this, and what it does not tell you</div>
+    <div class="grid-2 mt-2">
+      <div>
+        <p class="small"><strong>ROC AUC</strong> is the chance the model scores a randomly
+        chosen event day above a randomly chosen non-event day. 0.5 is a coin flip, 1.0 is
+        perfect. The per-fold spread next to it matters as much as the average: a tight spread
+        means the number is real, a wide one means the dataset is small enough that luck moves it.</p>
+        <p class="small mt-2"><strong>Average precision</strong> is the honest headline when
+        events are the minority class. ROC flatters a model on imbalanced data; the
+        precision-recall curve does not.</p>
+        <p class="small mt-2"><strong>Brier skill</strong> compares the squared error of the
+        predicted probabilities against the base rate. Positive is better than always guessing
+        the average; zero means the model has added nothing.</p>
+      </div>
+      <div>
+        <p class="small"><strong>The reliability diagram</strong> bins predictions and plots what
+        actually happened in each bin. Points on the diagonal mean the probabilities can be read
+        at face value. Points below it mean the model is overconfident. ECE is the average
+        distance from that diagonal, weighted by how many rows land in each bin.</p>
+        <p class="small mt-2"><strong>What this does not tell you:</strong> these datasets are
+        built from historical event records paired with reanalysis weather, sampled over the
+        continental United States. Performance on a hazard type, region, or season that is thinly
+        represented here is not measured by these numbers, and a model that scores well on
+        cross-validation can still be wrong about a place it has barely seen. The scores on this
+        platform are decision support, not a warning service.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/validation.js') }}"></script>
+{% endblock %}

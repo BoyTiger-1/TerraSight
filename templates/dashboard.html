@@ -6,9 +6,13 @@
   <div class="module-hero">
     <span class="eyebrow">Command Center</span>
     <h1 style="margin-top: 12px">Global situation, one screen.</h1>
-    <p class="tagline">A live global hazard heatmap built from worldwide seismicity and
-    active events. Click anywhere on the map, or search a city or street address, to run
-    all sixteen modules on that spot.</p>
+    <p class="tagline">Two maps in one. <strong>Live events</strong> shows worldwide seismicity
+    and open natural events, everything actually being reported right now. <strong>US model
+    grid</strong> runs the full pipeline instead: roughly eight hundred points covering every
+    state, each scored by the same trained models the module pages use, so the whole country
+    carries a hazard value whether or not anything has happened there, and the scrubber
+    under the map plays that field forward through the next seven days. Click anywhere on
+    either map, or search a city or street address, to run all sixteen modules on that spot.</p>
     <div class="searchbox mt-3" style="max-width: 560px">
       <input class="input" id="loc-search" type="search" autocomplete="off"
              placeholder="Search a city, place, or street address..."
@@ -19,9 +23,28 @@
   <div class="dash">
     <div class="dash-main">
       <div class="map-controls">
-        <span class="map-hint"><svg><use href="#i-pin"/></svg>
-          Brighter areas carry more hazard activity. Click anywhere to assess it; filter the field by type below.</span>
+        <div class="split" style="align-items: center; gap: 14px">
+          <div class="seg" id="map-modes">
+            <button data-mode="live" class="on">Live events</button>
+            <button data-mode="national">US model grid</button>
+          </div>
+          <span class="map-hint" id="map-hint"><svg><use href="#i-pin"/></svg>
+            Brighter areas carry more reported hazard activity. Click anywhere to assess it; filter the field by type below.</span>
+        </div>
         <div class="chips" id="type-filters"></div>
+        {# the outlook scrubber only exists in national mode, and only once the
+           grid reports more than one scored lead day #}
+        <div class="outlook" id="outlook-bar" hidden>
+          <button class="play" id="outlook-play" aria-label="Play the seven day outlook">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <input type="range" id="outlook-slider" min="0" max="6" step="1" value="0"
+                 aria-label="Forecast lead day">
+          <div class="outlook-read">
+            <span class="day" id="outlook-day">Today</span>
+            <span class="date muted" id="outlook-date"></span>
+          </div>
+        </div>
       </div>
       <div class="map-shell">
         <div id="map" role="application" aria-label="Interactive hazard map"></div>
@@ -44,6 +67,34 @@
     </div>
 
     <aside class="dash-side">
+      <div class="card" id="national-card" hidden>
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
+          National model grid <span class="muted">full pipeline</span></div>
+        <div id="national-body"></div>
+      </div>
+      <div class="card" id="watch-card">
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-pin"/></svg>
+          Watchlist <span class="muted" id="watch-count"></span></div>
+        <p class="muted small" id="watch-empty">
+          Save the places you actually care about and TerraSight checks them against the
+          national grid, seven days ahead, every time you open this page. The list lives in
+          this browser; nothing is sent anywhere but the score request.
+        </p>
+        <div id="watch-body"></div>
+        <div class="split mt-2">
+          <button class="chip" id="watch-add" hidden></button>
+          <select class="chip select" id="watch-threshold" aria-label="Alert threshold">
+            <option value="Moderate">Alert at Moderate</option>
+            <option value="High" selected>Alert at High</option>
+            <option value="Extreme">Alert at Extreme</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" id="changes-card" hidden>
+        <div class="panel-title"><svg width="15" height="15"><use href="#i-cascade"/></svg>
+          What changed <span class="muted" id="changes-window"></span></div>
+        <div class="feed" id="changes-body"></div>
+      </div>
       <div class="card">
         <div class="panel-title"><svg width="15" height="15"><use href="#i-alert"/></svg>
           Live natural events <span class="muted">NASA EONET</span></div>

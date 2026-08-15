@@ -19,13 +19,19 @@ def daily_frame(resp):
         "et0": d.get("et0_fao_evapotranspiration", []),
         "snowfall": d.get("snowfall_sum", []),
     }
-    # collapse hourly humidity down to a daily minimum, 24 readings per day
-    rh_hourly = (resp.get("hourly") or {}).get("relative_humidity_2m", [])
-    rh_min = []
-    for i in range(len(frame["time"])):
-        day = [v for v in rh_hourly[i * 24:(i + 1) * 24] if v is not None]
-        rh_min.append(min(day) if day else None)
-    frame["rh_min"] = rh_min
+    # humidity: prefer the daily minimum if the request asked for it directly
+    # (the bulk grid pipeline does, since 24 hourly values per point per day is
+    # far too much payload for 800 locations), otherwise collapse the hourly
+    # series down ourselves, 24 readings per day
+    if d.get("relative_humidity_2m_min"):
+        frame["rh_min"] = d["relative_humidity_2m_min"]
+    else:
+        rh_hourly = (resp.get("hourly") or {}).get("relative_humidity_2m", [])
+        rh_min = []
+        for i in range(len(frame["time"])):
+            day = [v for v in rh_hourly[i * 24:(i + 1) * 24] if v is not None]
+            rh_min.append(min(day) if day else None)
+        frame["rh_min"] = rh_min
     return frame
 
 

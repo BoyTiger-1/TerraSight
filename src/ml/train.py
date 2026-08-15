@@ -151,21 +151,59 @@ def train_one(name, samples):
     print(f"  saved {name}.pkl + card")
 
 
-def main():
-    print("=== wildfire model ===")
-    fire_samples = []
-    collect(FIRE_EVENTS, F.wildfire_features, 1, fire_samples)
-    negatives_for(FIRE_EVENTS, F.wildfire_features, fire_samples)
-    random_negatives(F.wildfire_features, fire_samples, 90)
-    train_one("wildfire", fire_samples)
+def samples_from_dataset(name):
+    """(rows, status) for the persisted training set.
 
-    print("\n=== flood model ===")
-    flood_samples = []
-    collect(FLOOD_EVENTS, F.flood_features, 1, flood_samples)
-    negatives_for(FLOOD_EVENTS, F.flood_features, flood_samples)
-    random_negatives(F.flood_features, flood_samples, 60)
-    train_one("flood", flood_samples)
+    the live collection below spends several thousand archive API units and its
+    rows used to be thrown away the moment the fit finished, which made a retrain
+    a several-hour errand and made honest validation impossible after the fact.
+    src.ml.dataset saves them, so prefer that whenever it is finished.
+
+    a half-collected dataset is deliberately refused: it is missing whole
+    categories of row rather than a random sample of them, and quietly fitting on
+    it would replace a good deployed model with a worse one."""
+    from src.ml import dataset
+    data = dataset.load(name)
+    rows = list((data.get("rows") or {}).values())
+    if not rows:
+        return None, "empty"
+    if not data.get("complete"):
+        return None, f"partial ({len(rows)} rows so far)"
+    return [(r["x"], r["y"]) for r in rows], "complete"
+
+
+def main(use_dataset=True):
+    for name, events, feature_fn, n_random in (
+            ("wildfire", FIRE_EVENTS, F.wildfire_features, 90),
+            ("flood", FLOOD_EVENTS, F.flood_features, 60)):
+        print(f"\n=== {name} model ===")
+        samples, status = samples_from_dataset(name) if use_dataset else (None, "skipped")
+        if samples:
+            print(f"  using {len(samples)} saved rows from src/ml/datasets/{name}.json")
+        elif status.startswith("partial"):
+            print(f"  dataset is {status}; keeping the existing {name} model rather than "
+                  f"retraining on part of one. finish it with: python -m src.ml.dataset {name}")
+            continue
+        else:
+            samples = []
+            collect(events, feature_fn, 1, samples)
+            negatives_for(events, feature_fn, samples)
+            random_negatives(feature_fn, samples, n_random)
+        train_one(name, samples)
+
+    # the validation page is only honest if it describes the models that are
+    # actually deployed, so regenerate it from the same rows in the same run
+    try:
+        from src.ml import validate
+        rep = validate.build_and_save()
+        for m in rep["models"]:
+            if m.get("available"):
+                print(f"\nvalidation {m['name']}: AUC {m['roc_auc']}, ECE {m['ece']}, "
+                      f"recall {m['confusion']['recall']} at the deployed cutoff")
+    except Exception as e:  # a failed report must never lose a good model
+        print(f"\ncould not regenerate the validation report: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    # --live forces the old behaviour: refetch every row from the archive API
+    main(use_dataset="--live" not in sys.argv)

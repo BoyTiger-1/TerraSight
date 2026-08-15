@@ -58,6 +58,9 @@ Modules marked impact are honestly framed: science cannot predict earthquakes, t
 - Cascading hazards. Twenty-two documented couplings connect the modules: drought primes wildfire, hurricanes drive flood and outages, quakes raise tsunami and landslide risk, winter storms load avalanche terrain, eruptions degrade air quality. When one score rises, downstream scores update.
 - Scenario simulation. Load real current conditions for any location, then shift temperature, precipitation, wind, humidity, snowpack, or sea surface temperature and watch every model rerun. Answers questions like "what if rainfall doubles" or "what does plus 2 degrees do here".
 - Executive reports. One click produces a professional multi-hazard situation report: summary, conditions, risk register, per-hazard analysis, cascade interactions, prioritized actions by audience, economic exposure, and data provenance. Print-ready.
+- Seven day national outlook. Every point in the national grid is scored on each of the next seven days, so the map animates forward through the week. The forecast window each lead day reads is held fixed, otherwise the country would appear to calm down at the end of the week purely because the forecast ran out.
+- Watchlist and change feed. Save the places you care about and they are checked against the week-ahead peak, not just today, because being told on Thursday that Thursday is dangerous is not much of a warning. A national feed diffs consecutive grid builds and reports only what actually crossed a risk band. The watchlist lives in the browser, so there are no accounts and nothing about who watches what is stored.
+- Published validation. `/validation` shows out-of-fold ROC and precision-recall curves, reliability diagrams, Brier skill against the base rate, the confusion matrix at the cutoff the product actually uses, and the twelve events each model got most wrong.
 - Economic impact. Population exposure from real census figures plus severity-scaled damage ratios in the spirit of FEMA Hazus, labeled clearly as order-of-magnitude planning estimates.
 
 ## Data sources
@@ -103,6 +106,7 @@ This regenerates the model files and their model cards, including cross-validate
 - `/module/<slug>` any of the sixteen module pages, for example `/module/wildfire`
 - `/simulator` scenario simulator
 - `/reports` executive report generator
+- `/validation` model validation: cross-validated ROC and precision-recall curves, reliability diagrams, the confusion matrix at the deployed cutoff, the full threshold tradeoff, and the events each model got most wrong
 - `/about` project story and methodology overview
 
 Tool pages accept `?lat=&lon=&name=` query parameters, so assessments are shareable links.
@@ -122,6 +126,10 @@ All endpoints return JSON.
 | `POST /api/scenario/run` | Body `{lat, lon, deltas}`, returns before and after scores |
 | `GET /api/live/overview` | Global live events, storms, and significant quakes |
 | `GET /api/live/heatmap` | Dense worldwide weighted points for the global hazard heatmap |
+| `GET /api/national/grid?layer=..&day=..` | The modelled hazard field over every US state, for a chosen lead day 0 to 6 |
+| `POST /api/alerts/check` | Body `{watchlist, threshold}`, scores saved locations against the week ahead |
+| `GET /api/alerts/changes` | What crossed a risk band between the two most recent grid builds |
+| `GET /api/validation` | Cross-validated performance report for the trained models |
 | `POST /api/wildfire/predict` | Legacy wildfire endpoint, same contract as the original app, now backed by the real-data model |
 | `POST /api/wildfire/predict-manual` | Legacy manual-input endpoint, kept for backward compatibility |
 
@@ -140,7 +148,9 @@ src/
     volcano_coords.py      Smithsonian GVP coordinates for monitored volcanoes
   ml/
     features.py          feature engineering shared by training and inference
+    dataset.py           paced, resumable collection of the labelled training rows
     train.py             training pipeline against the real event catalogs
+    validate.py          out-of-fold cross-validation, calibration, and threshold analysis
     registry.py          model loading, prediction, occlusion explanations
     models/              trained models and model cards
   modules/               the sixteen intelligence modules plus shared helpers

@@ -61,6 +61,11 @@ def reports_page():
     return render_template("reports.html", modules=module_meta())
 
 
+@app.route("/validation")
+def validation_page():
+    return render_template("validation.html", modules=module_meta())
+
+
 @app.route("/about")
 def about():
     return render_template("about.html", modules=module_meta())

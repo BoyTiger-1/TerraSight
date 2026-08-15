@@ -26,6 +26,60 @@ async function run(loc) {
   render(r, loc);
 }
 
+// where the numbers actually came from. some feeds have no reading at every
+// point on earth (river gauges need a river, sea surface temperature needs
+// ocean), so the snapshot walks outward until it finds one. that substitution
+// is a real caveat on the result and belongs on the page, not buried in JSON.
+function renderProvenance(prov, loc) {
+  const box = $("provenance");
+  if (!box) return;
+  const sub = prov.substituted_location;
+  const feeds = prov.substituted || [];
+  if (!sub && !feeds.length) { box.hidden = true; return; }
+
+  box.hidden = false;
+  const parts = [];
+  if (sub) {
+    parts.push(`<p class="muted small"><strong>Modelled from a nearby location.</strong>
+      No feed could be scored at ${loc.name} itself, so this assessment uses
+      ${sub.name || "the nearest point with coverage"}, about ${Math.round(sub.distance_km)} km away.
+      Confidence has been reduced accordingly.</p>`);
+  }
+  if (feeds.length) {
+    parts.push(`<p class="muted small">${feeds.length} of ${prov.feeds_total} data feeds had no
+      reading at this exact point and used the nearest available one:</p>`
+      + feeds.slice(0, 6).map(f => `<div class="feed-item">
+          <span class="tag">${f.feed}</span>
+          <span class="t small">${f.status === "unavailable" ? "no coverage found"
+            : f.status === "throttled" ? "archive busy, refreshes on the next load"
+            : `nearest reading, ${Math.round(f.distance_km)} km away`}</span></div>`).join(""));
+  }
+  box.innerHTML = `<div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
+    Data coverage at this point</div>${parts.join("")}`;
+}
+
+// the CMIP6 projection the climate module computes: mean summer-season tmax per
+// five-year bucket out to 2050, averaged across three downscaled models. it is
+// the one chart on the site that looks forward decades rather than days.
+let projChart = null;
+function renderProjection(proj) {
+  const card = $("projection-card");
+  if (!card) return;
+  const years = Object.keys(proj || {}).sort();
+  if (years.length < 3) { card.hidden = true; return; }
+
+  card.hidden = false;
+  const vals = years.map(y => proj[y]);
+  const shift = vals[vals.length - 1] - vals[0];
+  $("projection-note").textContent =
+    `CMIP6 ensemble mean of three downscaled models. Between the ${years[0]}s and the `
+    + `${years[years.length - 1]}s the daily maximum shifts by ${shift >= 0 ? "+" : ""}`
+    + `${shift.toFixed(1)}°C at this location.`;
+  if (projChart) projChart.destroy();
+  projChart = TS.lineChart($("projection-chart"), years.map(y => `${y}s`),
+    [{ name: "Projected daily max", data: vals, unit: "°C" }]);
+}
+
 function render(r, loc) {
   $("results").hidden = false;
   const a = r.assessment;
@@ -37,6 +91,8 @@ function render(r, loc) {
   $("conf-badge").textContent = `confidence: ${a.confidence_label} (${Math.round(a.confidence * 100)}%)`;
   $("kind-badge").textContent = a.kind === "impact" ? "impact model" : a.kind;
   $("headline").textContent = a.headline;
+  renderProvenance(r.data_provenance || {}, loc);
+  renderProjection(r.projection);
 
   // factor contribution bars, positive pushes risk, negative restrains it
   const fb = $("factors-body");

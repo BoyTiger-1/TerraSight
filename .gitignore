@@ -13,6 +13,13 @@ server_log.txt
 # local sqlite database, created automatically on first run
 database/app.db
 
+# the raw HTTP response cache is ~24MB of regenerable Open-Meteo payloads.
+# the national_*.json files next to it are NOT ignored on purpose: they are the
+# prebuilt heatmap, and shipping them means a fresh deploy serves a map on the
+# first request instead of spending 800+ API units and twelve minutes building one.
+.cache/http_cache.pkl
+.cache/*.tmp
+
 # environment files holding secrets like FIRMS_MAP_KEY
 .env
 
