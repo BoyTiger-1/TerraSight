@@ -57,9 +57,18 @@ GRID_LAYER_FOR = {
     "heatwave": "heat", "winter": "winter",
 }
 
-# past this the grid is describing weather that has since moved on. a day-old
-# national picture is a fair answer during an outage; a four-day-old one is not.
-GRID_MAX_AGE_SECONDS = 36 * 3600
+# past this the grid is describing weather that has since moved on.
+#
+# 36 hours was the first instinct and it was wrong in a way worth recording: the
+# grid shipped in the repo is the one a cold-started Render instance serves, its
+# generated_at is whenever it was last built and committed, and the rebuild gates
+# in national.py deliberately stop a spun-down instance from refreshing it. So a
+# cap that tight does not mean "serve only fresh data", it means the safety net
+# quietly stops existing a day and a half after each deploy -- precisely when
+# nobody is looking. Three days keeps it alive between grid commits, and the age
+# is in the headline and priced into confidence rather than hidden behind a
+# threshold.
+GRID_MAX_AGE_SECONDS = 72 * 3600
 
 
 def _grid_estimate(slug, snap):
@@ -90,11 +99,17 @@ def _grid_estimate(slug, snap):
     hours = int(age // 3600)
     label, color = risk_band(float(score))
     # a 1-degree national pass is a real answer but a blunter one than a
-    # point-resolution run, and it gets blunter the further the cell is: inside
+    # point-resolution run, and it gets blunter along two axes. distance: inside
     # the mainland lattice the nearest node is always close, but for an island or
-    # the far north it can be the next landmass over, which is a much weaker
-    # claim and should not be presented as an equally good one.
+    # the far north it can be the next landmass over. age: yesterday's national
+    # picture is a fair proxy, three days ago is a guess. both are visible in the
+    # provenance block, so both should move the number the UI shows.
     confidence = 0.45 if km <= 90 else 0.3 if km <= 180 else 0.2
+    if hours >= 48:
+        confidence *= 0.5
+    elif hours >= 24:
+        confidence *= 0.75
+    confidence = round(confidence, 2)
     return {
         "module": slug,
         "location": {"name": snap.name, "lat": snap.lat, "lon": snap.lon},
