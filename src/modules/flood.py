@@ -1,5 +1,7 @@
 # flood intelligence: ML rainfall-flood model trained on 37 real US floods,
-# blended with GloFAS river discharge percentiles and live USGS gauge readings
+# floored by GloFAS river discharge and live USGS gauge readings
+import math
+
 from src.analysis import economics
 from src.config import risk_band
 from src.ml import features as F
@@ -22,16 +24,57 @@ LABELS = {
 }
 
 
+# Rivers are compared against their own recent high-water mark, not against a
+# rank percentile. A rank is scale-blind: it reports the same "100th percentile"
+# for a river forecast 2% above its two-month high as for one forecast to run ten
+# times over, and on a dry channel where every past reading is 0.00 m3/s it
+# saturates the instant any water at all appears. Both cases used to floor the
+# score at 90 "Extreme", which is how Santa Fe scored Extreme flood on an arroyo
+# peaking at 1.4 m3/s with no rain in a week, and Sacramento scored High on a
+# 29.90 -> 30.48 m3/s rise.
+#
+# What matters hydrologically is the *ratio* of the forecast peak to the flow the
+# channel has actually been carrying, plus whether there is enough water in it to
+# leave the banks at all.
+DISCHARGE_TRIGGER_RATIO = 1.15   # below this the river is inside its recent range
+DISCHARGE_FULL_SCALE_M3S = 10.0  # a channel smaller than this cannot flood a floodplain
+DISCHARGE_FLOOR_GAIN = 40.0      # 2x the recent high -> 40, 3x -> 63, 5.5x -> capped 95
+DISCHARGE_FLOOR_CAP = 95.0
+
+
+def _discharge_floor(peak, high):
+    """minimum flood score justified by river discharge alone.
+
+    `high` is the 90th percentile of the last 60 days: the level the river has
+    recently been running at when it was already high. Exceeding it matters in
+    proportion to how far, on a log scale, so each doubling adds a fixed amount
+    rather than any exceedance jumping straight to Extreme.
+
+    The result is scaled down for small channels, so a mountain creek going from
+    a trickle to a slightly larger trickle stays Low no matter how many times
+    over its own baseline it runs."""
+    if peak is None or peak <= 0 or high is None:
+        return 0.0
+    # a channel whose past 60 days really are all 0.00 keeps the 0.05 floor: a dry
+    # wash carrying 1000 m3/s next week is a flood. the magnitude term below is
+    # what stops the same arithmetic firing on a puddle.
+    ratio = peak / max(high, 0.05)
+    if ratio < DISCHARGE_TRIGGER_RATIO:
+        return 0.0
+    magnitude = min(1.0, peak / DISCHARGE_FULL_SCALE_M3S)
+    return min(DISCHARGE_FLOOR_CAP, DISCHARGE_FLOOR_GAIN * math.log2(ratio)) * magnitude
+
+
 def quick(env):
     model = get_model("flood")
     if not model:
         return None
-    p = model.predict(env)
-    # discharge percentile override carries into the simulator too
-    pctl = env.get("discharge_pctl")
-    score = p * 100
-    if pctl is not None and pctl > 0.9:
-        score = max(score, 55 + (pctl - 0.9) * 350)
+    score = model.predict(env) * 100
+    # the discharge floor carries into the simulator too, so a river already out
+    # of its banks cannot be dragged down to Low by the rainfall sliders alone
+    peak, high = env.get("discharge_peak"), env.get("discharge_high")
+    if peak is not None:
+        score = max(score, _discharge_floor(peak, high))
     return round(min(score, 100), 1)
 
 
@@ -44,9 +87,16 @@ def _discharge_context(flood_resp):
     past, future = q[:60], q[60:]
     now = past[-1] if past else None
     peak_fc = max(future) if future else now
-    pctl = base.percentile_of(peak_fc, past) if peak_fc is not None else None
+    ordered = sorted(past)
+    high = ordered[int(0.9 * (len(ordered) - 1))] if ordered else None
     return {"time": daily.get("time", []), "series": daily.get("river_discharge", []),
-            "current": now, "forecast_peak": peak_fc, "peak_percentile": pctl}
+            "current": now, "forecast_peak": peak_fc,
+            "recent_high": high,
+            # kept for display: honest as a description of where the peak sits in
+            # the recent record, just never used to drive the score
+            "peak_percentile": base.percentile_of(peak_fc, past) if peak_fc is not None else None,
+            "excess_ratio": (peak_fc / max(high or 0.0, 0.05)) if peak_fc else None,
+            "floor": _discharge_floor(peak_fc, high)}
 
 
 def assess(snap):
@@ -78,10 +128,16 @@ def assess(snap):
                 score, best_day = p_i * 100, f_i
                 prob, explanation = model.explain(f_i)
 
-    # GloFAS: if the river is forecast above its 90th percentile, floor the score
+    # GloFAS: a river forecast to run well above its recent high floors the score
     ctx = _discharge_context(snap.flood())
-    if ctx and ctx["peak_percentile"] is not None and ctx["peak_percentile"] > 0.9:
-        score = max(score, 55 + (ctx["peak_percentile"] - 0.9) * 350)
+    if ctx:
+        score = max(score, ctx["floor"])
+        # carry the river state into the feature dict the simulator re-scores, so
+        # quick() applies the same floor as the assessment. the model ignores keys
+        # outside its own feature list, and apply_deltas leaves these alone: a
+        # river already rising does not un-rise because you imagine less rain.
+        best_day = dict(best_day, discharge_peak=ctx["forecast_peak"],
+                        discharge_high=ctx["recent_high"])
 
     alerts = noaa.alerts_matching(snap.alerts(), ["flood", "flash flood", "hydrologic"])
     if any("warning" in (a.get("event") or "").lower() for a in alerts):
@@ -90,11 +146,15 @@ def assess(snap):
         score = max(score, 55)
 
     factors = base.ml_factors(explanation, LABELS)
-    if ctx and ctx["peak_percentile"] is not None:
-        factors.insert(0, base.factor("River discharge percentile",
-                                      round(ctx["peak_percentile"] * 100), "%",
-                                      0.3 if ctx["peak_percentile"] > 0.9 else 0.05,
-                                      "GloFAS forecast peak vs the last 60 days"))
+    if ctx and ctx["forecast_peak"] is not None:
+        factors.insert(0, base.factor("River discharge, forecast peak",
+                                      round(ctx["forecast_peak"], 1), "m3/s",
+                                      0.3 if ctx["floor"] >= 50 else 0.05,
+                                      f"GloFAS peak vs {ctx['recent_high']:.1f} m3/s, the "
+                                      f"level this channel has been running at when high "
+                                      f"over the last 60 days"
+                                      if ctx["recent_high"] is not None else
+                                      "GloFAS forecast peak over the next 30 days"))
     if alerts:
         factors.insert(0, base.factor("NWS flood alert", alerts[0].get("event"), "", 0.4,
                                       alerts[0].get("headline") or ""))
@@ -111,11 +171,23 @@ def assess(snap):
                     "series": [{"name": "River discharge", "data": ctx["series"], "unit": "m3/s"}]}
 
     label, _ = risk_band(score)
+    # describe the river by how far above its own normal flow it is running. the
+    # old wording quoted a rank percentile, which let the headline read "0 mm of
+    # rain in the last 7 days, river at the 100th percentile" on a dry channel.
+    river = "."
+    if ctx and ctx["excess_ratio"] is not None:
+        r = ctx["excess_ratio"]
+        if r >= DISCHARGE_TRIGGER_RATIO and ctx["floor"] > 0:
+            # the absolute figure has to travel with the ratio: 17x on a 1.4 m3/s
+            # arroyo and 3x on a 30 m3/s river are not the same news
+            river = (f", river forecast to run {r:.1f}x its recent high flow "
+                     f"({ctx['forecast_peak']:.1f} m3/s).")
+        else:
+            river = ", river within its normal range for the season."
     headline = (f"{label} flood risk. "
                 + (f"{alerts[0]['event']} in effect. " if alerts else "")
                 + f"{best_day['precip_7d_mm']:.0f} mm of rain in the last 7 days"
-                + (f", river at the {ctx['peak_percentile']*100:.0f}th percentile of its recent range."
-                   if ctx and ctx["peak_percentile"] is not None else "."))
+                + river)
 
     auc = model.card.get("cv_roc_auc_mean", 0.8)
     confidence = min(0.95, auc * (1.0 - (0.1 if not ctx else 0)))
@@ -130,8 +202,10 @@ def assess(snap):
         sources=["Open-Meteo forecast + ERA5", "Open-Meteo Flood API (GloFAS v4)",
                  "USGS NWIS river gauges", "NOAA NWS alerts"],
         methodology=("Gradient-boosted classifier trained on 37 documented US flood "
-                     "disasters matched with ERA5 rainfall history, blended with GloFAS "
-                     "river discharge percentiles and live NWS flood alerts. "
+                     "disasters matched with ERA5 rainfall history. The score is floored "
+                     "by GloFAS river discharge when the forecast peak runs above the "
+                     "level the channel has recently carried, scaled by how far above and "
+                     "by the size of the channel, and by live NWS flood alerts. "
                      f"Cross-validated ROC AUC {auc}."),
         extras={"model_card": model.card, "gauges": gauges})
 
@@ -172,6 +246,7 @@ def _recommendations(score, alerts):
                              "Conditions are dry. A good week to check flood insurance coverage",
                              "flood damage is excluded from standard homeowners policies"))
     recs.append(base.rec("advisory", "insurers",
-                         "Discharge percentile above 90 is the leading indicator for claim clusters",
+                         "A river forecast well above its recent high flow is the leading "
+                         "indicator for claim clusters",
                          "riverine losses lag the hydrograph peak by hours to days"))
     return recs
