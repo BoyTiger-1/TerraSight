@@ -288,6 +288,8 @@ def health():
     """cache and pipeline health, so a data problem is visible instead of
     showing up as mysteriously empty panels"""
     return jsonify({"http_cache": dict(http_client.stats),
+                    "rate_limits": http_client.limit_report(),
+                    "cache_entries": http_client.cache_size(),
                     "national_grid": national.status(),
                     "snapshots_cached": len(_snaps)})
 

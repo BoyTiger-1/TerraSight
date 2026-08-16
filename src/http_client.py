@@ -81,6 +81,27 @@ def rate_limited_for(url):
     return max(0.0, until - time.time())
 
 
+def cache_size():
+    """how many responses are in the cache. zero on a box that has never had a
+    successful call, which distinguishes "throttled but coping on stale data"
+    from "throttled with nothing to fall back on" -- very different failures."""
+    with _lock:
+        return len(_cache)
+
+
+def limit_report():
+    """which hosts are throttled, for how long, and what they said.
+
+    /api/health could already report that requests were being refused but not
+    why, which is the only part that tells you whether the fix is to wait, to
+    slow down, or to stop asking this host from this machine at all."""
+    now = time.time()
+    with _lock:
+        items = list(_rate_limits.items())
+    return {host: {"resets_in": round(max(0.0, until - now)), "reason": reason[:200]}
+            for host, (until, reason) in items if until > now}
+
+
 # ---------------------------------------------------------------- disk cache
 
 def _load_disk():

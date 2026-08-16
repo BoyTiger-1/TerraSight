@@ -39,8 +39,46 @@ const heatLayer = L.heatLayer([], {
 const gridHeat = L.heatLayer([], {
   radius: 40, blur: 34, maxZoom: 8, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
 });
+
+// leaflet.heat sizes its kernel in screen pixels, but the grid is spaced in
+// degrees, so a fixed radius only looks continuous at one zoom level. one degree
+// is about 11px at zoom 4 and 182px at zoom 8: leave the radius at 40 and the
+// national sheet shatters into isolated dots the moment anyone zooms into their
+// own state, which reads as missing data rather than as a rendering artifact.
+// re-derive it from the actual point spacing on every zoom instead.
+function gridKernel() {
+  const spacing = (gridData && gridData.spacing_deg) || 1;
+  const c = map.getCenter();
+  const z = map.getZoom();
+  const a = map.project([c.lat, c.lng], z);
+  const b = map.project([c.lat, c.lng + spacing], z);
+  // 0.75 of the gap is the point where neighbouring kernels overlap enough to
+  // read as one surface without smearing a hot cell across its calm neighbours
+  const px = Math.abs(b.x - a.x) * 0.75;
+  return Math.max(18, Math.min(px, 260));
+}
+
+function resizeGridHeat() {
+  if (!map.hasLayer(gridHeat)) return;
+  const r = gridKernel();
+  gridHeat.setOptions({ radius: r, blur: r * 0.85 });
+  // past the clamp the blur can no longer bridge the gap between points, so the
+  // tiled cells take over: they are the same numbers drawn as 1-degree squares,
+  // which tile exactly and therefore cover the country at any zoom. without this
+  // the map goes bare at city zoom and reads as missing data.
+  const needCells = r >= 260;
+  if (needCells !== autoCells) {
+    autoCells = needCells;
+    drawCells();
+  }
+}
+
+map.on("zoomend", resizeGridHeat);
 const gridCells = L.layerGroup();
 let gridData = null, gridLayerName = "composite", cellsOn = false, statusTimer = null;
+// set by resizeGridHeat when the zoom outruns the heat kernel, so the cells can
+// appear on their own without clobbering the user's explicit toggle
+let autoCells = false;
 
 // the outlook animation. each lead day is a separate small response, so frames
 // are cached by "layer:day" the first time they are drawn: scrubbing back and
@@ -126,6 +164,7 @@ function setMode(next) {
     map.removeLayer(heatLayer);
     syncMarkers();
     gridHeat.addTo(map);
+    resizeGridHeat();
     document.getElementById("map-hint").textContent =
       "Every point in the country carries a modelled score, not just where something was reported. Click anywhere to run the full 16-module assessment on it.";
     map.flyTo([39.5, -98.5], 4, { duration: 1.0 });
@@ -165,6 +204,7 @@ async function loadGrid(layerName, day) {
   gridData = res;
   outlookDays = res.days || [];
   gridHeat.setLatLngs(res.points);
+  resizeGridHeat();
   drawCells();
   buildGridControls();
   buildOutlook();
@@ -270,7 +310,7 @@ function pollStatus() {
 
 function drawCells() {
   gridCells.clearLayers();
-  if (!cellsOn || !gridData) { map.removeLayer(gridCells); return; }
+  if ((!cellsOn && !autoCells) || !gridData) { map.removeLayer(gridCells); return; }
   const half = (gridData.spacing_deg || 1) / 2;
   gridData.cells.forEach((c) => {
     L.rectangle([[c.lat - half, c.lon - half], [c.lat + half, c.lon + half]], {
