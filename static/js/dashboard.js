@@ -40,97 +40,181 @@ const heatLayer = L.heatLayer([], {
   radius: 22, blur: 16, maxZoom: 0, minOpacity: 0.22, gradient: GRADIENT,
 }).addTo(map);
 
-// the modelled field is a regular lattice, so it wants a wider, softer kernel
-// than scattered point events: adjacent cells should blend into a continuous
-// surface rather than read as 800 separate dots.
+// ---------- the modelled field ----------
+// leaflet.heat is the wrong renderer for this data and no amount of kernel
+// tuning fixes it. It draws one blob per node, so the map is always a lattice of
+// blobs: the gaps are fixed in degrees, so they widen on screen as you zoom in,
+// and the blobs overlap and sum as you zoom out. Two rounds of tuning bought
+// honest colour at the node centres and still left visible dots between them.
 //
-// maxZoom: 0 is deliberate and load-bearing. leaflet.heat multiplies every
-// point's intensity by
-//     v = 1 / 2 ^ clamp(options.maxZoom - map.getZoom(), 0, 12)
-// which is right for a density map of scattered events -- zooming in spreads
-// them apart, so each one has to count for more -- and completely wrong here.
-// These points are a modelled field: each carries an absolute 0-1 risk score,
-// and 0.8 has to mean the same colour at every zoom. With maxZoom: 8 the same
-// cell rendered 1/16 intensity at zoom 4 and full intensity at zoom 8, so the
-// whole country changed colour as you scrolled. Pinning maxZoom to 0 forces
-// v == 1 at every zoom, and the gradient then reads the score directly.
-const gridHeat = L.heatLayer([], {
-  // placeholder geometry; resizeGridHeat() derives the real radius and blur from
-  // the on-screen point spacing before this ever draws. kept in the same 0.30
-  // blur ratio as KERNEL_BLUR so the two cannot drift apart.
-  radius: 40, blur: 12, maxZoom: 0, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
+// A modelled field wants interpolation, not accumulation. This layer asks the
+// only question that has a defined answer -- "what does the model say *here*" --
+// for every screen pixel, and the answer depends on geography and the data
+// alone. So it is exact at the nodes, continuous between them, and identical at
+// every zoom by construction rather than by tuning.
+//
+// The nodes are not a single lattice: CONUS is spaced 1 degree, Alaska 2.5, and
+// Hawaii and Puerto Rico are lone points thousands of km from anything. Bilinear
+// interpolation needs a regular grid, so this uses local Shepard weights with a
+// per-node support radius derived from that node's own nearest neighbour, which
+// adapts to all three cases without special-casing any of them.
+const FIELD_ALPHA = 0.78;
+// widest a node's influence can reach, in degrees. sized so Alaska's 2.5-degree
+// lattice still joins up; it also bounds the spatial hash query below.
+const MAX_SUPPORT = 2.7;
+
+let fieldNodes = [], fieldHash = null;
+
+function buildField(data) {
+  const spacing = data.spacing_deg || 1;
+  const cells = data.cells || [];
+  fieldNodes = cells.map(c => ({ lat: c.lat, lon: c.lon, v: c.v, r: 0 }));
+
+  // each node's support is set by how far away its nearest neighbour actually
+  // is, so a 1-degree CONUS node blends with its neighbours while a 2.5-degree
+  // Alaska node reaches far enough to find its own. A node whose nearest
+  // neighbour is beyond MAX_SUPPORT is an island with nothing to blend with, so
+  // it covers just its own cell rather than a spurious 300 km disc of ocean.
+  for (let i = 0; i < fieldNodes.length; i++) {
+    const a = fieldNodes[i];
+    let nn = Infinity;
+    for (let j = 0; j < fieldNodes.length; j++) {
+      if (i === j) continue;
+      const b = fieldNodes[j];
+      const d = (a.lat - b.lat) ** 2 + (a.lon - b.lon) ** 2;
+      if (d < nn) nn = d;
+    }
+    nn = Math.sqrt(nn);
+    a.r = nn > MAX_SUPPORT ? spacing * 0.5
+        : Math.max(Math.min(nn * 1.35, MAX_SUPPORT), spacing * 0.8);
+  }
+
+  // spatial hash on MAX_SUPPORT-sized buckets: a lookup only has to scan the
+  // 3x3 block around the query, which is what keeps the per-pixel cost flat
+  // whatever the grid size.
+  fieldHash = new Map();
+  fieldNodes.forEach((n) => {
+    const key = `${Math.floor(n.lat / MAX_SUPPORT)},${Math.floor(n.lon / MAX_SUPPORT)}`;
+    let bucket = fieldHash.get(key);
+    if (!bucket) { bucket = []; fieldHash.set(key, bucket); }
+    bucket.push(n);
+  });
+}
+
+// a bucket is MAX_SUPPORT degrees wide, which is hundreds of pixels at the zooms
+// people actually use, so consecutive pixels along a scanline nearly always want
+// the same nine buckets. caching the merged candidate list turns the common case
+// into a single string compare.
+let candKey = null, candList = null;
+function candidatesFor(lat, lon) {
+  const bj = Math.floor(lat / MAX_SUPPORT), bi = Math.floor(lon / MAX_SUPPORT);
+  const key = `${bj},${bi}`;
+  if (key === candKey) return candList;
+  const list = [];
+  for (let dj = -1; dj <= 1; dj++) {
+    for (let di = -1; di <= 1; di++) {
+      const bucket = fieldHash.get(`${bj + dj},${bi + di}`);
+      if (bucket) for (let k = 0; k < bucket.length; k++) list.push(bucket[k]);
+    }
+  }
+  candKey = key; candList = list;
+  return list;
+}
+
+// the model's value at an arbitrary point, or null where nothing is in range
+function fieldValue(lat, lon) {
+  if (!fieldHash) return null;
+  const cands = candidatesFor(lat, lon);
+  let sum = 0, wsum = 0;
+  for (let k = 0; k < cands.length; k++) {
+    const n = cands[k];
+    const dlat = lat - n.lat, dlon = lon - n.lon;
+    const d = Math.sqrt(dlat * dlat + dlon * dlon);
+    if (d >= n.r) continue;
+    if (d <= 1e-9) return n.v;          // standing on a node: report it exactly
+    // Shepard weight, first power on purpose. Squaring it -- the textbook
+    // default -- makes the nearest node dominate so hard that the value sits
+    // flat at that node's score for the first fifth of the gap and then lurches,
+    // which renders as a square plateau around every point: the country breaks
+    // into blocks. First power still goes infinite at the node (so the field is
+    // exact there) but the profile between two nodes is near-linear.
+    const w = (n.r - d) / (n.r * d);
+    sum += w * n.v; wsum += w;
+  }
+  return wsum > 0 ? sum / wsum : null;
+}
+
+// 0-100 to the map ramp, interpolated. Same stops as scoreColor() below, so the
+// smooth field and the crisp cells are the same palette and agree at the stops.
+const RAMP = [[0, 29, 79, 92], [25, 47, 125, 140], [40, 53, 179, 156],
+              [55, 217, 161, 59], [70, 224, 112, 58], [85, 224, 82, 82]];
+// rounded here rather than at the call sites: writing a float into the tile's
+// Uint8ClampedArray rounds half-to-even while Math.round does not, which left
+// the field and the cells one unit apart on some values for no good reason.
+function rampRGB(v) {
+  if (v <= RAMP[0][0]) return RAMP[0].slice(1);
+  for (let i = 1; i < RAMP.length; i++) {
+    if (v <= RAMP[i][0]) {
+      const [t0, r0, g0, b0] = RAMP[i - 1], [t1, r1, g1, b1] = RAMP[i];
+      const f = (v - t0) / (t1 - t0);
+      return [Math.round(r0 + (r1 - r0) * f),
+              Math.round(g0 + (g1 - g0) * f),
+              Math.round(b0 + (b1 - b0) * f)];
+    }
+  }
+  return RAMP[RAMP.length - 1].slice(1);
+}
+function rampColor(v) {
+  const [r, g, b] = rampRGB(v);
+  return `rgb(${r},${g},${b})`;
+}
+
+const GridField = L.GridLayer.extend({
+  createTile(coords) {
+    const tile = L.DomUtil.create("canvas", "leaflet-tile");
+    const size = this.getTileSize();
+    tile.width = size.x; tile.height = size.y;
+    if (!fieldNodes.length) return tile;
+
+    // one sample per pixel, written straight to the tile. An earlier version
+    // sampled every 2px and let drawImage smooth the result up, which was
+    // cheaper but reintroduced exactly the bug this layer exists to kill: the
+    // smoothing footprint is fixed in screen pixels, so in degrees it shrinks as
+    // you zoom, and a point halfway between two nodes drifted from rgb(178,150,81)
+    // at zoom 4 to rgb(220,138,59) at zoom 9. At one sample per pixel the colour
+    // on screen is just fieldValue() at that pixel's centre, which depends on
+    // geography alone.
+    const w = size.x, h = size.y;
+    const ctx = tile.getContext("2d");
+    const img = ctx.createImageData(w, h);
+    const nw = coords.scaleBy(size);
+
+    // web mercator is separable -- longitude depends only on x and latitude only
+    // on y -- so w + h unprojections cover the whole tile instead of w * h
+    const lons = new Float64Array(w), lats = new Float64Array(h);
+    for (let i = 0; i < w; i++) lons[i] = map.unproject(nw.add([i + 0.5, 0]), coords.z).lng;
+    for (let j = 0; j < h; j++) lats[j] = map.unproject(nw.add([0, j + 0.5]), coords.z).lat;
+
+    const px = img.data;
+    const alpha = Math.round(FIELD_ALPHA * 255);
+    for (let j = 0; j < h; j++) {
+      const lat = lats[j];
+      for (let i = 0; i < w; i++) {
+        const v = fieldValue(lat, lons[i]);
+        if (v === null) continue;                 // stays transparent
+        const [r, g, b] = rampRGB(v);
+        const o = (j * w + i) * 4;
+        px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = alpha;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return tile;
+  },
 });
 
-// leaflet.heat sizes its kernel in screen pixels, but the grid is spaced in
-// degrees, so a fixed radius only looks continuous at one zoom level. one degree
-// is about 11px at zoom 4 and 182px at zoom 8: leave the radius at 40 and the
-// national sheet shatters into isolated dots the moment anyone zooms into their
-// own state, which reads as missing data rather than as a rendering artifact.
-// re-derive it from the actual point spacing on every zoom instead.
-//
-// The kernel also decides whether the colours are honest, not just whether the
-// sheet is continuous, and the binding constraint is how far it actually reaches.
-// leaflet.heat draws each point as a radial ramp of `radius` and then applies a
-// canvas shadowBlur of `blur` on top, so a point paints out to
-//
-//     reach = radius * (1 + KERNEL_BLUR)
-//
-// and every point inside that reach adds its intensity to this one's, because
-// the circles composite source-over and _colorize maps the *accumulated* alpha
-// through the gradient. Once reach exceeds the point spacing a cell is coloured
-// by its neighbours as much as by itself: at radius 0.75x spacing with the stock
-// blur of 0.85x radius, reach is 1.39 spacings, and a real 0.30 cell in New
-// Mexico sampled green at zoom 7 and orange at zoom 8. Alone it is teal at both.
-//
-// So reach has to stay under one spacing. Shrinking the radius to get there is
-// the wrong lever -- it holds the colour but the sheet breaks into 800 visible
-// dots. Shrinking the blur instead buys the same headroom and keeps the disc
-// wide: 0.70 * 1.30 = 0.91 spacings of reach, with discs of 0.70 spacings that
-// still overlap their neighbours (2 x 0.70 > 1) and read as one surface.
-//
-// Measured on the live grid, this renders the exact gradient colour for the
-// score at every zoom: 0.551 computes to rgb(177,165,83) and samples (177,165,81),
-// 0.300 computes to (50,152,148) and samples (50,152,149) -- the same values
-// scoreColor() gives the tiled cells, so the two agree where they hand over.
-const KERNEL_RATIO = 0.70;
-const KERNEL_BLUR = 0.30;
-// below this the kernel is too small to read as a surface, above it the blur can
-// no longer bridge the gap between points. outside the band the tiled cells take
-// over: same numbers, drawn as exact 1-degree squares.
-const HEAT_MIN_PX = 12, HEAT_MAX_PX = 260;
-
-function gridGeometry() {
-  const spacing = (gridData && gridData.spacing_deg) || 1;
-  const c = map.getCenter();
-  const z = map.getZoom();
-  const a = map.project([c.lat, c.lng], z);
-  const b = map.project([c.lat, c.lng + spacing], z);
-  const spacingPx = Math.abs(b.x - a.x);
-  const radius = spacingPx * KERNEL_RATIO;
-  return { radius, faithful: radius >= HEAT_MIN_PX && radius <= HEAT_MAX_PX };
-}
-
-function resizeGridHeat() {
-  if (!map.hasLayer(gridHeat)) return;
-  const g = gridGeometry();
-  // never clamp the radius into a range where neighbours would reach this
-  // point's centre. if the honest kernel is unusable at this zoom, stop drawing
-  // heat and let the cells carry the map instead of drawing a blended sheet that
-  // lies about the data.
-  gridHeat.setOptions({ radius: g.radius, blur: g.radius * KERNEL_BLUR });
-  gridHeat.setLatLngs(g.faithful && gridData ? gridData.points : []);
-  if (g.faithful !== !autoCells) {
-    autoCells = !g.faithful;
-    drawCells();
-  }
-}
-
-map.on("zoomend", resizeGridHeat);
+const gridField = new GridField({ opacity: 1, pane: "overlayPane", className: "ts-field" });
 const gridCells = L.layerGroup();
 let gridData = null, gridLayerName = "composite", cellsOn = false, statusTimer = null;
-// set by resizeGridHeat when the zoom outruns the heat kernel, so the cells can
-// appear on their own without clobbering the user's explicit toggle
-let autoCells = false;
 
 // the outlook animation. each lead day is a separate small response, so frames
 // are cached by "layer:day" the first time they are drawn: scrubbing back and
@@ -215,8 +299,7 @@ function setMode(next) {
   if (mode === "national") {
     map.removeLayer(heatLayer);
     syncMarkers();
-    gridHeat.addTo(map);
-    resizeGridHeat();
+    gridField.addTo(map);
     document.getElementById("map-hint").textContent =
       "Every point in the country carries a modelled score, not just where something was reported. Click anywhere to run the full 16-module assessment on it.";
     map.flyTo([39.5, -98.5], 4, { duration: 1.0 });
@@ -224,7 +307,7 @@ function setMode(next) {
   } else {
     stopPlay();
     document.getElementById("outlook-bar").hidden = true;
-    map.removeLayer(gridHeat);
+    map.removeLayer(gridField);
     map.removeLayer(gridCells);
     if (heatOn) heatLayer.addTo(map);
     syncMarkers();
@@ -255,8 +338,8 @@ async function loadGrid(layerName, day) {
   }
   gridData = res;
   outlookDays = res.days || [];
-  gridHeat.setLatLngs(res.points);
-  resizeGridHeat();   // may swap heat for cells depending on the current zoom
+  buildField(res);
+  gridField.redraw();
   drawCells();
   buildGridControls();
   buildOutlook();
@@ -362,14 +445,14 @@ function pollStatus() {
 
 function drawCells() {
   gridCells.clearLayers();
-  if ((!cellsOn && !autoCells) || !gridData) { map.removeLayer(gridCells); return; }
+  if (!cellsOn || !gridData) { map.removeLayer(gridCells); return; }
   const half = (gridData.spacing_deg || 1) / 2;
   gridData.cells.forEach((c) => {
     L.rectangle([[c.lat - half, c.lon - half], [c.lat + half, c.lon + half]], {
-      // opacity is tuned to sit close to what the heat kernel renders at the
-      // same score, so crossing the zoom where one hands over to the other is
-      // not itself read as the colours changing
-      color: scoreColor(c.v), weight: 0.5, fillColor: scoreColor(c.v),
+      // the same ramp the interpolated field uses, so switching the cells on
+      // overlays exact squares in the colours already on screen rather than a
+      // second, slightly different palette
+      color: rampColor(c.v), weight: 0.5, fillColor: rampColor(c.v),
       fillOpacity: 0.6, interactive: true,
     }).bindPopup(cellPopup(c)).addTo(gridCells);
   });
