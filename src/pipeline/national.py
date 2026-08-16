@@ -726,6 +726,42 @@ def _synced_grid():
     return _state["grid"]
 
 
+def peek():
+    """the grid we already have, or None. never starts a build.
+
+    ensure() is the wrong door for a caller that is only asking "is there
+    anything on disk I could read", because a stale grid makes it kick off a
+    rebuild -- and the one caller that needs this most is runner.assess during an
+    upstream outage, which is exactly when spending more quota is the worst
+    possible response."""
+    with _state_lock:
+        return _synced_grid()
+
+
+def nearest_point(lat, lon, max_km=320.0):
+    """the grid row closest to a coordinate, if one is near enough to speak for it.
+
+    the lattice is 1 degree, so anywhere in the interior sits within about 78 km
+    of a node and the distance is a non-issue. the cap exists for the places that
+    are not interior: the lattice is masked to land, so Oahu's nearest node is on
+    the Big Island 265 km away, Barrow's is 244 km down the coast, and Key West's
+    is 175 km up the peninsula. A cap tight enough to please the mainland would
+    hand exactly those places nothing at all, which is the opposite of the
+    guarantee this module is here to keep -- so it is set wide enough to reach
+    them and the caller discounts confidence by the distance instead. Beyond this
+    we really are out over open ocean and should decline."""
+    grid = peek()
+    rows = (grid or {}).get("points") or []
+    best, best_km = None, None
+    for row in rows:
+        km = haversine_km(lat, lon, row["lat"], row["lon"])
+        if best_km is None or km < best_km:
+            best, best_km = row, km
+    if best is None or best_km > max_km:
+        return None, None
+    return best, best_km
+
+
 def _progress(phase, done, total):
     with _state_lock:
         _state["phase"] = phase

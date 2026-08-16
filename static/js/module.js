@@ -35,10 +35,22 @@ function renderProvenance(prov, loc) {
   if (!box) return;
   const sub = prov.substituted_location;
   const feeds = prov.substituted || [];
-  if (!sub && !feeds.length) { box.hidden = true; return; }
+  const grid = prov.national_grid_fallback;
+  if (!sub && !feeds.length && !grid) { box.hidden = true; return; }
 
   box.hidden = false;
   const parts = [];
+  // a score read off the national grid is the strongest caveat this page can
+  // carry -- coarser, older, and possibly from a cell some distance away -- so
+  // it goes first and says all three plainly rather than reading as a live run
+  if (grid) {
+    parts.push(`<p class="muted small"><strong>Read from the national hazard model.</strong>
+      The live weather feed is over its daily free-tier quota, so this score comes
+      from the most recent nationwide model run &mdash; the same model on a
+      1&deg; grid, computed ${grid.age_hours}h ago from the cell
+      ${Math.round(grid.distance_km)} km away. It is a coarser answer than a
+      point-resolution run and confidence has been lowered to match.</p>`);
+  }
   if (sub) {
     parts.push(`<p class="muted small"><strong>Modelled from a nearby location.</strong>
       No feed could be scored at ${loc.name} itself, so this assessment uses

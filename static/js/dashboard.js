@@ -542,16 +542,18 @@ async function assess(loc) {
     .map(([slug, r]) => ({ slug, score: r.assessment.score, level: r.assessment.level,
       title: window.TS_MODULES[slug].title,
       boost: r.cascades && r.cascades.score_after > r.cascades.score_before,
+      grid: (r.data_provenance || {}).national_grid_fallback,
       sub: (r.data_provenance || {}).substituted_location }))
     .sort((a, b) => b.score - a.score);
 
   matrixBody.innerHTML = "";
-  rows.forEach(({ slug, score, level, title, boost, sub }) => {
+  rows.forEach(({ slug, score, level, title, boost, sub, grid }) => {
     const row = document.createElement("div");
     row.className = "matrix-row";
     // when a module had to borrow a neighbouring location's data, say so on the
     // row rather than quietly presenting it as a reading for this exact spot
     const tags = (boost ? ` <span class="tag" title="raised by cascade coupling">coupled</span>` : "")
+      + (grid ? ` <span class="tag" title="live feed over quota, so this is the national 1-degree model run from ${grid.age_hours}h ago, cell ${Math.round(grid.distance_km)} km away">national model</span>` : "")
       + (sub ? ` <span class="tag" title="no data at this exact point, modelled from ${Math.round(sub.distance_km)} km away">nearest ${Math.round(sub.distance_km)} km</span>` : "");
     row.innerHTML = `
       <svg><use href="#i-${slug}"/></svg>
