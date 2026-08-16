@@ -29,8 +29,15 @@ for (const k of Object.keys(KIND_META)) { heatByKind[k] = []; markersByKind[k] =
 
 let heatOn = true, markersOn = false, liveCounts = {};
 const GRADIENT = { 0.2: "#2f7d8c", 0.4: "#35b39c", 0.6: "#d9a13b", 0.8: "#e0703a", 1.0: "#e05252" };
+// the live layer is closer to what leaflet.heat was written for -- scattered
+// reports rather than a lattice -- but its legend reads "Reported hazard
+// intensity", and intensity is a property of the event, not of how far you have
+// zoomed. maxZoom: 0 for the same reason as the grid below: it pins the
+// zoom-intensity multiplier at 1 so a magnitude-6 quake is the same colour at
+// every zoom. Overlapping reports still add, which is the honest reading of a
+// cluster; only the zoom rescaling was wrong.
 const heatLayer = L.heatLayer([], {
-  radius: 22, blur: 16, maxZoom: 6, minOpacity: 0.22, gradient: GRADIENT,
+  radius: 22, blur: 16, maxZoom: 0, minOpacity: 0.22, gradient: GRADIENT,
 }).addTo(map);
 
 // the modelled field is a regular lattice, so it wants a wider, softer kernel
@@ -48,7 +55,10 @@ const heatLayer = L.heatLayer([], {
 // whole country changed colour as you scrolled. Pinning maxZoom to 0 forces
 // v == 1 at every zoom, and the gradient then reads the score directly.
 const gridHeat = L.heatLayer([], {
-  radius: 40, blur: 34, maxZoom: 0, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
+  // placeholder geometry; resizeGridHeat() derives the real radius and blur from
+  // the on-screen point spacing before this ever draws. kept in the same 0.30
+  // blur ratio as KERNEL_BLUR so the two cannot drift apart.
+  radius: 40, blur: 12, maxZoom: 0, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
 });
 
 // leaflet.heat sizes its kernel in screen pixels, but the grid is spaced in
@@ -59,17 +69,31 @@ const gridHeat = L.heatLayer([], {
 // re-derive it from the actual point spacing on every zoom instead.
 //
 // The kernel also decides whether the colours are honest, not just whether the
-// sheet is continuous. leaflet.heat bins points into squares of radius/2 px and
-// *sums* the intensities of everything sharing a bin before clamping at `max`:
+// sheet is continuous, and the binding constraint is how far it actually reaches.
+// leaflet.heat draws each point as a radial ramp of `radius` and then applies a
+// canvas shadowBlur of `blur` on top, so a point paints out to
 //
-//     g = radius/2;  bin = [floor(x/g), floor(y/g)];  bin[2] += intensity
+//     reach = radius * (1 + KERNEL_BLUR)
 //
-// so the moment two grid points share a bin their risk scores add together and
-// clamp to solid red. Keeping radius below 2x the point spacing guarantees one
-// point per bin, which is what makes a score of 0.6 render as 0.6 at every zoom.
-// 0.75x the spacing sits comfortably inside that and still overlaps neighbours
-// enough to read as one surface rather than 800 separate dots.
-const KERNEL_RATIO = 0.75;
+// and every point inside that reach adds its intensity to this one's, because
+// the circles composite source-over and _colorize maps the *accumulated* alpha
+// through the gradient. Once reach exceeds the point spacing a cell is coloured
+// by its neighbours as much as by itself: at radius 0.75x spacing with the stock
+// blur of 0.85x radius, reach is 1.39 spacings, and a real 0.30 cell in New
+// Mexico sampled green at zoom 7 and orange at zoom 8. Alone it is teal at both.
+//
+// So reach has to stay under one spacing. Shrinking the radius to get there is
+// the wrong lever -- it holds the colour but the sheet breaks into 800 visible
+// dots. Shrinking the blur instead buys the same headroom and keeps the disc
+// wide: 0.70 * 1.30 = 0.91 spacings of reach, with discs of 0.70 spacings that
+// still overlap their neighbours (2 x 0.70 > 1) and read as one surface.
+//
+// Measured on the live grid, this renders the exact gradient colour for the
+// score at every zoom: 0.551 computes to rgb(177,165,83) and samples (177,165,81),
+// 0.300 computes to (50,152,148) and samples (50,152,149) -- the same values
+// scoreColor() gives the tiled cells, so the two agree where they hand over.
+const KERNEL_RATIO = 0.70;
+const KERNEL_BLUR = 0.30;
 // below this the kernel is too small to read as a surface, above it the blur can
 // no longer bridge the gap between points. outside the band the tiled cells take
 // over: same numbers, drawn as exact 1-degree squares.
@@ -89,10 +113,11 @@ function gridGeometry() {
 function resizeGridHeat() {
   if (!map.hasLayer(gridHeat)) return;
   const g = gridGeometry();
-  // never clamp the radius into a range where points would share a bin. if the
-  // honest kernel is unusable at this zoom, stop drawing heat and let the cells
-  // carry the map instead of drawing a saturated sheet that lies about the data.
-  gridHeat.setOptions({ radius: g.radius, blur: g.radius * 0.85 });
+  // never clamp the radius into a range where neighbours would reach this
+  // point's centre. if the honest kernel is unusable at this zoom, stop drawing
+  // heat and let the cells carry the map instead of drawing a blended sheet that
+  // lies about the data.
+  gridHeat.setOptions({ radius: g.radius, blur: g.radius * KERNEL_BLUR });
   gridHeat.setLatLngs(g.faithful && gridData ? gridData.points : []);
   if (g.faithful !== !autoCells) {
     autoCells = !g.faithful;
