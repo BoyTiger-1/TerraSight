@@ -12,7 +12,9 @@
         TerraSight fuses live feeds from NASA, NOAA, USGS, and Open-Meteo with
         machine learning trained on real historical disasters. Sixteen hazard
         modules, explainable predictions, cascading-risk modeling, and reports
-        written for the people who have to decide.
+        written for the people who have to decide. The whole United States
+        carries a modelled score seven days out, not just the places something
+        has already happened.
       </p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="/dashboard">
@@ -26,6 +28,7 @@
         <div class="stat"><div class="v" id="stat-quakes">0</div><div class="k">M4.5+ quakes, 7 days</div></div>
         <div class="stat"><div class="v" id="stat-storms">0</div><div class="k">Active tropical cyclones</div></div>
         <div class="stat"><div class="v">16</div><div class="k">Intelligence modules</div></div>
+        <div class="stat"><div class="v" id="stat-grid">0</div><div class="k">US points scored daily</div></div>
       </div>
     </div>
   </div>
@@ -54,6 +57,74 @@
   </div>
 </section>
 
+<section class="section" id="national" style="padding-top: 0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">02 / National model grid</span>
+      <h2>The whole country, scored. Not just where something happened.</h2>
+      <p class="sub">Most hazard maps only light up where an event was reported, which means the
+      quiet places look safe rather than unmeasured. TerraSight runs the full pipeline over a
+      grid covering every state and territory, then interpolates between the points so any
+      coordinate in the US has an answer, seven days ahead.</p>
+    </div>
+
+    <div class="card pad-lg reveal field-card">
+      <div class="field-head">
+        <div>
+          <div class="panel-title" style="margin: 0">
+            <svg width="15" height="15"><use href="#i-layers"/></svg>
+            Composite hazard, live from the model grid
+          </div>
+          <p class="small muted" style="margin-top: 6px" id="field-caption">Loading today's field...</p>
+        </div>
+        <div class="field-legend" aria-hidden="true">
+          <span class="small muted">Low</span>
+          <i class="ramp"></i>
+          <span class="small muted">Extreme</span>
+        </div>
+      </div>
+
+      <div class="field-stage">
+        <canvas id="field-preview" aria-label="Modelled composite hazard across the contiguous United States"></canvas>
+        <div class="field-day" id="field-day">Today</div>
+      </div>
+
+      <div class="field-foot">
+        <div class="field-ticks" id="field-ticks" aria-hidden="true"></div>
+        <a class="btn btn-ghost btn-sm" href="/dashboard#national">
+          Open the live map <svg width="14" height="14"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+      <p class="small muted mt-2" id="field-note">
+        Contiguous states shown; Alaska, Hawaii and Puerto Rico are scored too and appear on the
+        full map. Every pixel is the model evaluated at that pixel's own location, so the colour
+        means the same thing at every zoom level.
+      </p>
+    </div>
+
+    <div class="grid-3 mt-3">
+      <div class="card reveal">
+        <h3>Every coordinate resolves</h3>
+        <p class="small muted mt-1">Ask for a score anywhere in the US and you get one. If a live
+        feed is busy for your exact point, the grid answers from the nearest scored neighbours
+        instead of refusing, and the response says so.</p>
+      </div>
+      <div class="card reveal reveal-d1">
+        <h3>Seven-day outlook</h3>
+        <p class="small muted mt-1">The scrubber under the map plays the field forward day by day,
+        so you can watch a drought ridge build or a storm track cross the country rather than
+        reading one static snapshot.</p>
+      </div>
+      <div class="card reveal reveal-d2">
+        <h3>Watchlist and change alerts</h3>
+        <p class="small muted mt-1">Save the places you actually care about. TerraSight checks
+        them against the grid every visit and tells you what crossed a threshold since last time.
+        The list stays in your browser.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="marquee" aria-hidden="true">
   <div class="track">
     {% for _ in range(2) %}
@@ -70,7 +141,7 @@
 <section class="section">
   <div class="wrap">
     <div class="section-head reveal">
-      <span class="eyebrow">02 / How it works</span>
+      <span class="eyebrow">03 / How it works</span>
       <h2>From raw satellite feed to a decision you can defend.</h2>
     </div>
     <div class="steps">
@@ -94,7 +165,7 @@
   <div class="wrap">
     <div class="grid-2">
       <div class="card pad-lg reveal">
-        <span class="eyebrow">03 / Coupled systems</span>
+        <span class="eyebrow">04 / Coupled systems</span>
         <h2 style="font-size: 28px; margin-top: 14px">Disasters do not happen one at a time.</h2>
         <p class="mt-2" style="color: var(--ink-2)">
           Drought primes wildfire. Hurricanes drive flood, surge, and blackout at once.
@@ -114,7 +185,7 @@
         </div>
       </div>
       <div class="card pad-lg reveal reveal-d1">
-        <span class="eyebrow">04 / Honest science</span>
+        <span class="eyebrow">05 / Honest science</span>
         <h2 style="font-size: 28px; margin-top: 14px">Prediction where possible. Impact modeling where not.</h2>
         <p class="mt-2" style="color: var(--ink-2)">
           No one on Earth can predict an earthquake, and TerraSight will not pretend to.
@@ -128,6 +199,53 @@
           <span class="badge" style="margin-left: 8px"><span class="dot" style="background: var(--chart-2)"></span> monitoring</span>
         </div>
         <p class="mt-2 small muted">Every module page states which one it is, in plain language, next to the score.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0">
+  <div class="wrap">
+    <div class="grid-2">
+      <div class="card pad-lg reveal">
+        <span class="eyebrow">06 / Measured, not asserted</span>
+        <h2 style="font-size: 28px; margin-top: 14px">The models are scored in public.</h2>
+        <p class="mt-2" style="color: var(--ink-2)">
+          Anyone can claim an accuracy number. Every predictive model here is run through
+          stratified five-fold cross-validation on the same labelled events it was trained on,
+          and the results page publishes discrimination, calibration, and the Brier skill against
+          simply predicting the base rate. Where a model is poorly calibrated in a band, the
+          reliability curve shows it rather than hiding it behind one headline figure.
+        </p>
+        <div class="mt-3" id="valid-rows">
+          <p class="small muted">Loading the validation report...</p>
+        </div>
+        <a class="btn btn-ghost btn-sm mt-3" href="/validation">
+          See the full report <svg width="14" height="14"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+
+      <div class="card pad-lg reveal reveal-d1">
+        <span class="eyebrow">07 / Scenario simulator</span>
+        <h2 style="font-size: 28px; margin-top: 14px">Not just what is coming. What would have to change.</h2>
+        <p class="mt-2" style="color: var(--ink-2)">
+          Take any real location and move the conditions. The simulator re-runs every model
+          against the altered state, so you get the counterfactual rather than a guess.
+        </p>
+        <div class="mt-3">
+          <div class="matrix-row mrow-note"><svg><use href="#i-sliders"/></svg>
+            <div><a>Sensitivity</a>
+              <div class="small muted">ranks which variable this place is most exposed to</div></div></div>
+          <div class="matrix-row mrow-note"><svg><use href="#i-cascade"/></svg>
+            <div><a>Response curve</a>
+              <div class="small muted">sweeps one knob and plots every hazard against it</div></div></div>
+          <div class="matrix-row mrow-note"><svg><use href="#i-alert"/></svg>
+            <div><a>Threshold finder</a>
+              <div class="small muted">how far a knob must move to cross a risk band</div></div></div>
+        </div>
+        <a class="btn btn-ghost btn-sm mt-3" href="/simulator">
+          Open the simulator <svg width="14" height="14"><use href="#i-arrow"/></svg>
+        </a>
       </div>
     </div>
   </div>
@@ -150,5 +268,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/field.js') }}"></script>
 <script src="{{ url_for('static', filename='js/home.js') }}"></script>
 {% endblock %}

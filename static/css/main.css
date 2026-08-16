@@ -750,7 +750,60 @@ table.data tr.row-mark td:first-child { box-shadow: inset 2px 0 0 var(--accent);
 .spark > i { flex: 1; border-radius: 1.5px; min-height: 2px; }
 .chip.select { padding: 5px 8px; font-family: inherit; }
 
+/* ---------- homepage national field preview ---------- */
+
+.field-card { overflow: hidden; }
+.field-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.field-legend { display: flex; align-items: center; gap: 10px; }
+/* same stops as TSField's RAMP, so the key matches the pixels above it */
+.field-legend .ramp {
+  display: block; width: 150px; height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, #1d4f5c, #2f7d8c 25%, #35b39c 40%, #d9a13b 55%, #e0703a 70%, #e05252 85%);
+}
+
+.field-stage {
+  position: relative; margin-top: 20px; border-radius: var(--radius);
+  border: 1px solid var(--border-soft); background: var(--surface-2); overflow: hidden;
+}
+/* the canvas is drawn at the grid's own aspect, so reserve the box up front and
+   let the height follow the width -- otherwise the whole page reflows the moment
+   the field finishes rendering */
+/* 1.818 is the CONUS box in web mercator, matching the height home.js computes */
+#field-preview { display: block; width: 100%; aspect-ratio: 1.818; }
+.field-day {
+  position: absolute; left: 14px; top: 12px; font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2);
+  background: rgba(11, 15, 21, 0.62); border: 1px solid var(--border-soft);
+  border-radius: 999px; padding: 5px 12px; backdrop-filter: blur(6px);
+}
+
+.field-foot { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-top: 16px; flex-wrap: wrap; }
+.field-ticks { display: flex; gap: 6px; flex-wrap: wrap; }
+.field-ticks button {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--ink-3); background: transparent; border: 1px solid var(--border-soft);
+  border-radius: 999px; padding: 5px 11px; cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.field-ticks button:hover { color: var(--ink); border-color: var(--border); }
+.field-ticks button.on { color: var(--accent-ink); border-color: var(--accent); background: rgba(53, 179, 156, 0.10); }
+
+.valid-row { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border-soft); }
+.valid-row:first-child { border-top: none; }
+.valid-row .nm { flex: 1; text-transform: capitalize; }
+.valid-row .mt { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); }
+.valid-row .mt b { color: var(--ink); font-weight: 600; }
+
+/* the simulator teasers borrow .matrix-row for its rule and icon rhythm but
+   carry prose instead of a score, so the two fixed right-hand columns go. */
+.matrix-row.mrow-note { grid-template-columns: 26px 1fr; align-items: start; }
+.matrix-row.mrow-note svg { margin-top: 3px; }
+.matrix-row.mrow-note a { display: block; margin-bottom: 3px; }
+
 /* ---------- misc ---------- */
+
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }

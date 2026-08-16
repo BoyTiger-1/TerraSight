@@ -143,3 +143,213 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
   }, { threshold: 0.4 });
   pairs.forEach(([id]) => { const el = document.getElementById(id); if (el) io.observe(el); });
 })();
+
+// ---------- national model grid preview ----------
+// Draws the real field, same interpolation the command center uses, over a
+// CONUS bounding box in web mercator so it matches the live map. Each lead day
+// is rendered once into its own offscreen canvas and then just blitted, so
+// playing the week through is free after the first pass.
+(() => {
+  const canvas = document.getElementById("field-preview");
+  if (!canvas || !window.TSField) return;
+
+  // CONUS only. The full grid includes Alaska, Hawaii and Puerto Rico, but a box
+  // wide enough for Alaska shrinks the lower 48 to a smudge; the caption says so.
+  const W_LON = -125.2, E_LON = -66.4, S_LAT = 24.2, N_LAT = 49.6;
+  const DAYS = 7;
+  const HOLD = 1100;           // ms a frame stays up while playing
+
+  const merc = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+  const Y0 = merc(N_LAT), Y1 = merc(S_LAT);
+
+  const ctx = canvas.getContext("2d");
+  const caption = document.getElementById("field-caption");
+  const dayLabel = document.getElementById("field-day");
+  const ticks = document.getElementById("field-ticks");
+  const frames = new Array(DAYS).fill(null);   // day -> offscreen canvas
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let day = 0, timer = null, spacing = 1, started = false, nearby = false;
+
+  const dayName = (d) => {
+    if (d === 0) return "Today";
+    if (d === 1) return "Tomorrow";
+    const t = new Date(); t.setDate(t.getDate() + d);
+    return t.toLocaleDateString(undefined, { weekday: "long" });
+  };
+
+  const sizeCanvas = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    // cap the backing store: this is a decorative preview, and every pixel is an
+    // interpolation, so a retina 1200px card would be a million field lookups
+    const w = Math.min(Math.round(canvas.clientWidth * dpr), 900);
+    canvas.width = w;
+    canvas.height = Math.round(w * (Y0 - Y1) / ((E_LON - W_LON) * Math.PI / 180));
+  };
+
+  // render one day's grid into an offscreen canvas at the current size
+  function renderFrame(data) {
+    const f = TSField.create();
+    f.build(data);
+    spacing = data.spacing_deg || 1;
+    const w = canvas.width, h = canvas.height;
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const octx = off.getContext("2d");
+    const img = octx.createImageData(w, h);
+    const px = img.data;
+
+    // separable like the map tiles: longitude depends only on x, latitude only on y
+    const lons = new Float64Array(w), lats = new Float64Array(h);
+    for (let i = 0; i < w; i++) lons[i] = W_LON + ((i + 0.5) / w) * (E_LON - W_LON);
+    for (let j = 0; j < h; j++) {
+      const y = Y0 + ((j + 0.5) / h) * (Y1 - Y0);
+      lats[j] = (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
+    }
+
+    for (let j = 0; j < h; j++) {
+      const lat = lats[j];
+      for (let i = 0; i < w; i++) {
+        const v = f.value(lat, lons[i]);
+        if (v === null) continue;                 // offshore stays transparent
+        const [r, g, b] = TSField.rampRGB(v);
+        const o = (j * w + i) * 4;
+        px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 235;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    return off;
+  }
+
+  const paint = () => {
+    const f = frames[day];
+    if (!f) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(f, 0, 0);
+    dayLabel.textContent = dayName(day);
+    [...ticks.children].forEach((b, i) => b.classList.toggle("on", i === day));
+  };
+
+  const show = (d) => { day = d; paint(); };
+
+  const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+  const play = () => {
+    if (reduced || timer) return;
+    timer = setInterval(() => {
+      // only advance onto days that are actually loaded, so a slow fetch shows a
+      // held frame rather than a blank one
+      let next = (day + 1) % DAYS;
+      if (!frames[next]) next = 0;
+      show(next);
+    }, HOLD);
+  };
+
+  async function load() {
+    sizeCanvas();
+    const first = await TS.fetchJSON("/api/national/grid?layer=composite&day=0");
+    if (first.error || !first.cells || !first.cells.length) {
+      caption.textContent = "The national grid is rebuilding; the live map has the current field.";
+      return;
+    }
+    frames[0] = renderFrame(first);
+    show(0);
+    caption.textContent =
+      `${first.cells.length.toLocaleString()} scored points at ${spacing}° spacing, ` +
+      `interpolated to every pixel. Click a day to scrub the outlook.`;
+
+    if (nearby) loadRest();
+  }
+
+  // the remaining days trickle in; each is a separate small response
+  let restStarted = false;
+  async function loadRest() {
+    if (restStarted || !frames[0]) return;
+    restStarted = true;
+    for (let d = 1; d < DAYS; d++) {
+      const res = await TS.fetchJSON(`/api/national/grid?layer=composite&day=${d}`);
+      if (res.error || !res.cells || !res.cells.length) break;
+      frames[d] = renderFrame(res);
+      ticks.children[d].disabled = false;
+    }
+    play();
+  }
+
+  // build the day buttons up front so the control does not pop in later
+  for (let d = 0; d < DAYS; d++) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = d === 0 ? "Today" : `+${d}d`;
+    b.disabled = d !== 0;
+    b.addEventListener("click", () => { stop(); if (frames[d]) show(d); });
+    ticks.appendChild(b);
+  }
+
+  // The first frame is not gated on visibility. Day 0 is one small cached
+  // request and a few hundred milliseconds of interpolation, and gating it on an
+  // IntersectionObserver meant the field could still be empty when someone
+  // scrolled straight to it. The observer below only governs the animation, so a
+  // reader who never reaches this section still costs six fewer requests.
+  const start = () => { if (!started) { started = true; load(); } };
+  if (document.readyState === "complete") setTimeout(start, 0);
+  else addEventListener("load", start, { once: true });
+
+  const setNearby = (v) => {
+    if (v === nearby) return;
+    nearby = v;
+    if (v) { start(); loadRest(); play(); } else { stop(); }
+  };
+
+  new IntersectionObserver((entries) => {
+    for (const e of entries) setNearby(e.isIntersecting);
+  }, { threshold: 0, rootMargin: "400px 0px" }).observe(canvas);
+
+  // A plain scroll check backs the observer up. Inside an iframe, and in a few
+  // headless setups, the observer has been seen to never deliver an intersecting
+  // entry, which leaves the six outlook days unloaded and their ticks disabled.
+  addEventListener("scroll", () => {
+    const r = canvas.getBoundingClientRect();
+    setNearby(r.bottom > -400 && r.top < innerHeight + 400);
+  }, { passive: true });
+
+  // re-render at the new size on a real width change, debounced
+  let rw = canvas.clientWidth, rt = null;
+  addEventListener("resize", () => {
+    if (Math.abs(canvas.clientWidth - rw) < 40) return;
+    rw = canvas.clientWidth;
+    clearTimeout(rt);
+    rt = setTimeout(() => { started = false; restStarted = false; frames.fill(null); stop(); load(); }, 300);
+  }, { passive: true });
+})();
+
+// ---------- grid coverage stat + validation numbers ----------
+(async () => {
+  const el = document.getElementById("stat-grid");
+  if (el) {
+    const s = await TS.fetchJSON("/api/national/status");
+    if (!s.error && s.scored_points) {
+      const io = new IntersectionObserver((entries, obs) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          TS.countUp(e.target, s.scored_points);
+          obs.disconnect();
+        }
+      }, { threshold: 0.4 });
+      io.observe(el);
+    }
+  }
+
+  const rows = document.getElementById("valid-rows");
+  if (!rows) return;
+  const v = await TS.fetchJSON("/api/validation");
+  const models = (v && v.models || []).filter(m => m.available !== false && m.roc_auc != null);
+  if (!models.length) {
+    rows.innerHTML = '<p class="small muted">Validation runs with training; the report page ' +
+      'has the current numbers.</p>';
+    return;
+  }
+  rows.innerHTML = models.map(m => `
+    <div class="valid-row">
+      <span class="nm">${m.name}</span>
+      <span class="mt">AUC <b>${m.roc_auc.toFixed(3)}</b></span>
+      <span class="mt">Brier skill <b>${m.brier_skill != null ? m.brier_skill.toFixed(3) : "n/a"}</b></span>
+    </div>`).join("");
+})();

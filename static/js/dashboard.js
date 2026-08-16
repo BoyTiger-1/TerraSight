@@ -40,141 +40,20 @@ const heatLayer = L.heatLayer([], {
   radius: 22, blur: 16, maxZoom: 0, minOpacity: 0.22, gradient: GRADIENT,
 }).addTo(map);
 
-// ---------- the modelled field ----------
-// leaflet.heat is the wrong renderer for this data and no amount of kernel
-// tuning fixes it. It draws one blob per node, so the map is always a lattice of
-// blobs: the gaps are fixed in degrees, so they widen on screen as you zoom in,
-// and the blobs overlap and sum as you zoom out. Two rounds of tuning bought
-// honest colour at the node centres and still left visible dots between them.
-//
-// A modelled field wants interpolation, not accumulation. This layer asks the
-// only question that has a defined answer -- "what does the model say *here*" --
-// for every screen pixel, and the answer depends on geography and the data
-// alone. So it is exact at the nodes, continuous between them, and identical at
-// every zoom by construction rather than by tuning.
-//
-// The nodes are not a single lattice: CONUS is spaced 1 degree, Alaska 2.5, and
-// Hawaii and Puerto Rico are lone points thousands of km from anything. Bilinear
-// interpolation needs a regular grid, so this uses local Shepard weights with a
-// per-node support radius derived from that node's own nearest neighbour, which
-// adapts to all three cases without special-casing any of them.
+// the interpolated national field lives in field.js, shared with the homepage
+// preview so both draw the same surface from the same math.
+const field = TSField.create();
+const buildField = (data) => field.build(data);
+const fieldValue = (lat, lon) => field.value(lat, lon);
+const rampRGB = TSField.rampRGB, rampColor = TSField.rampColor;
 const FIELD_ALPHA = 0.78;
-// widest a node's influence can reach, in degrees. sized so Alaska's 2.5-degree
-// lattice still joins up; it also bounds the spatial hash query below.
-const MAX_SUPPORT = 2.7;
-
-let fieldNodes = [], fieldHash = null;
-
-function buildField(data) {
-  const spacing = data.spacing_deg || 1;
-  const cells = data.cells || [];
-  fieldNodes = cells.map(c => ({ lat: c.lat, lon: c.lon, v: c.v, r: 0 }));
-
-  // each node's support is set by how far away its nearest neighbour actually
-  // is, so a 1-degree CONUS node blends with its neighbours while a 2.5-degree
-  // Alaska node reaches far enough to find its own. A node whose nearest
-  // neighbour is beyond MAX_SUPPORT is an island with nothing to blend with, so
-  // it covers just its own cell rather than a spurious 300 km disc of ocean.
-  for (let i = 0; i < fieldNodes.length; i++) {
-    const a = fieldNodes[i];
-    let nn = Infinity;
-    for (let j = 0; j < fieldNodes.length; j++) {
-      if (i === j) continue;
-      const b = fieldNodes[j];
-      const d = (a.lat - b.lat) ** 2 + (a.lon - b.lon) ** 2;
-      if (d < nn) nn = d;
-    }
-    nn = Math.sqrt(nn);
-    a.r = nn > MAX_SUPPORT ? spacing * 0.5
-        : Math.max(Math.min(nn * 1.35, MAX_SUPPORT), spacing * 0.8);
-  }
-
-  // spatial hash on MAX_SUPPORT-sized buckets: a lookup only has to scan the
-  // 3x3 block around the query, which is what keeps the per-pixel cost flat
-  // whatever the grid size.
-  fieldHash = new Map();
-  fieldNodes.forEach((n) => {
-    const key = `${Math.floor(n.lat / MAX_SUPPORT)},${Math.floor(n.lon / MAX_SUPPORT)}`;
-    let bucket = fieldHash.get(key);
-    if (!bucket) { bucket = []; fieldHash.set(key, bucket); }
-    bucket.push(n);
-  });
-}
-
-// a bucket is MAX_SUPPORT degrees wide, which is hundreds of pixels at the zooms
-// people actually use, so consecutive pixels along a scanline nearly always want
-// the same nine buckets. caching the merged candidate list turns the common case
-// into a single string compare.
-let candKey = null, candList = null;
-function candidatesFor(lat, lon) {
-  const bj = Math.floor(lat / MAX_SUPPORT), bi = Math.floor(lon / MAX_SUPPORT);
-  const key = `${bj},${bi}`;
-  if (key === candKey) return candList;
-  const list = [];
-  for (let dj = -1; dj <= 1; dj++) {
-    for (let di = -1; di <= 1; di++) {
-      const bucket = fieldHash.get(`${bj + dj},${bi + di}`);
-      if (bucket) for (let k = 0; k < bucket.length; k++) list.push(bucket[k]);
-    }
-  }
-  candKey = key; candList = list;
-  return list;
-}
-
-// the model's value at an arbitrary point, or null where nothing is in range
-function fieldValue(lat, lon) {
-  if (!fieldHash) return null;
-  const cands = candidatesFor(lat, lon);
-  let sum = 0, wsum = 0;
-  for (let k = 0; k < cands.length; k++) {
-    const n = cands[k];
-    const dlat = lat - n.lat, dlon = lon - n.lon;
-    const d = Math.sqrt(dlat * dlat + dlon * dlon);
-    if (d >= n.r) continue;
-    if (d <= 1e-9) return n.v;          // standing on a node: report it exactly
-    // Shepard weight, first power on purpose. Squaring it -- the textbook
-    // default -- makes the nearest node dominate so hard that the value sits
-    // flat at that node's score for the first fifth of the gap and then lurches,
-    // which renders as a square plateau around every point: the country breaks
-    // into blocks. First power still goes infinite at the node (so the field is
-    // exact there) but the profile between two nodes is near-linear.
-    const w = (n.r - d) / (n.r * d);
-    sum += w * n.v; wsum += w;
-  }
-  return wsum > 0 ? sum / wsum : null;
-}
-
-// 0-100 to the map ramp, interpolated. Same stops as scoreColor() below, so the
-// smooth field and the crisp cells are the same palette and agree at the stops.
-const RAMP = [[0, 29, 79, 92], [25, 47, 125, 140], [40, 53, 179, 156],
-              [55, 217, 161, 59], [70, 224, 112, 58], [85, 224, 82, 82]];
-// rounded here rather than at the call sites: writing a float into the tile's
-// Uint8ClampedArray rounds half-to-even while Math.round does not, which left
-// the field and the cells one unit apart on some values for no good reason.
-function rampRGB(v) {
-  if (v <= RAMP[0][0]) return RAMP[0].slice(1);
-  for (let i = 1; i < RAMP.length; i++) {
-    if (v <= RAMP[i][0]) {
-      const [t0, r0, g0, b0] = RAMP[i - 1], [t1, r1, g1, b1] = RAMP[i];
-      const f = (v - t0) / (t1 - t0);
-      return [Math.round(r0 + (r1 - r0) * f),
-              Math.round(g0 + (g1 - g0) * f),
-              Math.round(b0 + (b1 - b0) * f)];
-    }
-  }
-  return RAMP[RAMP.length - 1].slice(1);
-}
-function rampColor(v) {
-  const [r, g, b] = rampRGB(v);
-  return `rgb(${r},${g},${b})`;
-}
 
 const GridField = L.GridLayer.extend({
   createTile(coords) {
     const tile = L.DomUtil.create("canvas", "leaflet-tile");
     const size = this.getTileSize();
     tile.width = size.x; tile.height = size.y;
-    if (!fieldNodes.length) return tile;
+    if (!field.size) return tile;
 
     // one sample per pixel, written straight to the tile. An earlier version
     // sampled every 2px and let drawImage smooth the result up, which was
