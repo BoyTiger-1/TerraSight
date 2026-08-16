@@ -6,6 +6,25 @@ import math
 from src import config
 from src.http_client import fetch_json, TTL_FORECAST, TTL_ARCHIVE, TTL_LIVE
 
+# Coordinates were rounded to 4 decimals, which is 11 metres. The weather models
+# behind these endpoints have cells of 11 kilometres, so two clicks 20 metres
+# apart produced two cache keys, two billed requests, and byte-identical data.
+# On a free tier billed per request that is the whole quota problem: every
+# visitor looking at a slightly different point in the same town paid full price.
+#
+# Snapping to the model's own resolution makes a town one cache entry. The error
+# introduced is at most half a cell, and the product already substitutes readings
+# from up to 150 km away when a point cannot be scored, so a few km is well
+# inside the accuracy this app claims.
+SNAP_MODEL_DEG = 0.1     # GFS/ICON forecast, ERA5 archive, CAMS air quality
+SNAP_FINE_DEG = 0.05     # GloFAS river cells and the marine grid are finer
+
+
+def _snap(lat, lon, step=SNAP_MODEL_DEG):
+    """round a point onto the upstream model's grid"""
+    return (round(round(lat / step) * step, 4),
+            round(round(lon / step) * step, 4))
+
 
 def geocode(query, count=6):
     """search place names, returns [{name, lat, lon, country, admin1, population}]"""
@@ -28,8 +47,9 @@ def geocode(query, count=6):
 
 def forecast(lat, lon, hourly=None, daily=None, past_days=0, forecast_days=7, extra=None):
     """current + forecast weather, pass variable lists per the open-meteo docs"""
+    lat, lon = _snap(lat, lon)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "timezone": "auto", "forecast_days": forecast_days,
     }
     if past_days:
@@ -78,8 +98,9 @@ def forecast_multi(points, daily=None, hourly=None, past_days=0, forecast_days=7
 
 def archive(lat, lon, start_date, end_date, daily=None, hourly=None):
     """ERA5 reanalysis back to 1940, this is real observed-assimilated data"""
+    lat, lon = _snap(lat, lon)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "start_date": start_date, "end_date": end_date, "timezone": "auto",
     }
     if daily:
@@ -90,8 +111,9 @@ def archive(lat, lon, start_date, end_date, daily=None, hourly=None):
 
 
 def air_quality(lat, lon, hourly=None, past_days=1, forecast_days=4):
+    lat, lon = _snap(lat, lon)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "timezone": "auto", "past_days": past_days, "forecast_days": forecast_days,
         "hourly": ",".join(hourly or [
             "pm2_5", "pm10", "ozone", "nitrogen_dioxide", "sulphur_dioxide",
@@ -103,8 +125,9 @@ def air_quality(lat, lon, hourly=None, past_days=1, forecast_days=4):
 
 def flood(lat, lon, past_days=60, forecast_days=30):
     """GloFAS v4 river discharge for the nearest river cell, m3/s"""
+    lat, lon = _snap(lat, lon, SNAP_FINE_DEG)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "daily": "river_discharge,river_discharge_max,river_discharge_median",
         "past_days": past_days, "forecast_days": forecast_days,
     }
@@ -113,8 +136,9 @@ def flood(lat, lon, past_days=60, forecast_days=30):
 
 def climate(lat, lon, start_date, end_date, daily, models=None):
     """CMIP6 downscaled projections out to 2050"""
+    lat, lon = _snap(lat, lon)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "start_date": start_date, "end_date": end_date,
         "models": ",".join(models or ["EC_Earth3P_HR", "MRI_AGCM3_2_S", "NICAM16_8S"]),
         "daily": ",".join(daily),
@@ -124,8 +148,9 @@ def climate(lat, lon, start_date, end_date, daily, models=None):
 
 def marine(lat, lon, past_days=1, forecast_days=5):
     """wave height and sea surface temperature, only valid over water"""
+    lat, lon = _snap(lat, lon, SNAP_FINE_DEG)
     params = {
-        "latitude": round(lat, 4), "longitude": round(lon, 4),
+        "latitude": lat, "longitude": lon,
         "hourly": "wave_height,sea_surface_temperature,wind_wave_height,swell_wave_height",
         "timezone": "auto", "past_days": past_days, "forecast_days": forecast_days,
     }
@@ -133,7 +158,12 @@ def marine(lat, lon, past_days=1, forecast_days=5):
 
 
 def elevation(points):
-    """batch elevation lookup, points is [(lat, lon), ...], returns list of meters"""
+    """batch elevation lookup, points is [(lat, lon), ...], returns list of meters
+
+    deliberately NOT snapped like the weather endpoints above: this is a 90 m
+    terrain model, and terrain() below samples a cross only 0.0045 deg wide to
+    get slope. Rounding those five points onto a 0.1 deg grid would collapse them
+    onto each other and report every mountain as flat."""
     lats = ",".join(str(round(p[0], 5)) for p in points)
     lons = ",".join(str(round(p[1], 5)) for p in points)
     data = fetch_json(config.OPEN_METEO_ELEVATION,

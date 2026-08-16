@@ -68,10 +68,20 @@ MEMORY_PAST_DAYS = 92
 MEMORY_SPACING_DEG = 2.5
 MEMORY_TTL = 22 * 3600      # the 90-day rainfall memory only moves day to day
 
-# how long a built grid is considered current. weather models update hourly but
-# a national risk field does not meaningfully move in less than a few hours, and
-# a slower cadence keeps us well inside the free API's daily budget.
-REFRESH_SECONDS = int(os.environ.get("TERRASIGHT_GRID_REFRESH", 8 * 3600))
+# how long a built grid is considered current.
+#
+# this used to be 8 hours, on the assumption that it kept us "well inside the
+# free API's daily budget". The arithmetic says otherwise: 821 points at
+# ceil(42/14) = 3 units each is 2,463 units per build, so three builds a day is
+# 7,389 of the 10,000 daily units. The grid was quietly spending 74% of the
+# quota, real visitors exhausted the rest, and every forecast-backed module then
+# answered "no data available" -- which looked like a coverage bug and was
+# actually a budget one.
+#
+# One build a day leaves ~7,500 units for people actually using the site. The
+# field is a seven day outlook; the day-0 layer being up to a day old costs far
+# less than the whole site going dark every afternoon.
+REFRESH_SECONDS = int(os.environ.get("TERRASIGHT_GRID_REFRESH", 24 * 3600))
 
 CACHE_DIR = os.environ.get(
     "TERRASIGHT_CACHE_DIR",
