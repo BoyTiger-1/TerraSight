@@ -73,6 +73,13 @@ def assess(slug, snap, allow_fallback=True):
 
     first_error = result["error"]
 
+    # some failures are properties of the server, not of the point. an unloadable
+    # model returns the same error at every latitude on earth, so walking twelve
+    # neighbours only spends a dozen snapshots' worth of API quota to be told the
+    # same thing twelve more times.
+    if result.get("model_missing"):
+        return result
+
     # the neighbour sweep costs a dozen fresh snapshots. that is worth it for a
     # genuine coverage gap, but not when the upstream is simply throttled: every
     # neighbour would hit the same closed door, twelve times over per module.

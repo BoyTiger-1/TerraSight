@@ -37,8 +37,14 @@ def assess(snap):
     frame = snap.daily()
     idx = snap.today_index()
     model = get_model("wildfire")
-    if not frame or idx is None or not model:
-        return {"error": "Weather data or trained model unavailable for this location."}
+    # a missing model is an environment fault, not a coverage gap: it fails
+    # identically everywhere, so say so rather than blaming this location and
+    # sending the runner off to search neighbours that cannot possibly help
+    if not model:
+        return {"error": "The wildfire model could not be loaded on this server.",
+                "model_missing": True}
+    if not frame or idx is None:
+        return {"error": "Weather data unavailable for this location."}
 
     feats = F.wildfire_features(frame, idx)
     if not feats:

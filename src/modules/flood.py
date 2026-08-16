@@ -53,8 +53,13 @@ def assess(snap):
     frame = snap.daily()
     idx = snap.today_index()
     model = get_model("flood")
-    if not frame or idx is None or not model:
-        return {"error": "Weather data or trained model unavailable for this location."}
+    # see the note in wildfire.assess: an unloadable model is the same failure at
+    # every point on earth, so it must not look like a local coverage gap
+    if not model:
+        return {"error": "The flood model could not be loaded on this server.",
+                "model_missing": True}
+    if not frame or idx is None:
+        return {"error": "Weather data unavailable for this location."}
 
     feats = F.flood_features(frame, idx)
     if not feats:
