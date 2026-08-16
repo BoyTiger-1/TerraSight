@@ -35,9 +35,20 @@ const heatLayer = L.heatLayer([], {
 
 // the modelled field is a regular lattice, so it wants a wider, softer kernel
 // than scattered point events: adjacent cells should blend into a continuous
-// surface rather than read as 800 separate dots
+// surface rather than read as 800 separate dots.
+//
+// maxZoom: 0 is deliberate and load-bearing. leaflet.heat multiplies every
+// point's intensity by
+//     v = 1 / 2 ^ clamp(options.maxZoom - map.getZoom(), 0, 12)
+// which is right for a density map of scattered events -- zooming in spreads
+// them apart, so each one has to count for more -- and completely wrong here.
+// These points are a modelled field: each carries an absolute 0-1 risk score,
+// and 0.8 has to mean the same colour at every zoom. With maxZoom: 8 the same
+// cell rendered 1/16 intensity at zoom 4 and full intensity at zoom 8, so the
+// whole country changed colour as you scrolled. Pinning maxZoom to 0 forces
+// v == 1 at every zoom, and the gradient then reads the score directly.
 const gridHeat = L.heatLayer([], {
-  radius: 40, blur: 34, maxZoom: 8, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
+  radius: 40, blur: 34, maxZoom: 0, minOpacity: 0.3, max: 1.0, gradient: GRADIENT,
 });
 
 // leaflet.heat sizes its kernel in screen pixels, but the grid is spaced in
@@ -46,29 +57,45 @@ const gridHeat = L.heatLayer([], {
 // national sheet shatters into isolated dots the moment anyone zooms into their
 // own state, which reads as missing data rather than as a rendering artifact.
 // re-derive it from the actual point spacing on every zoom instead.
-function gridKernel() {
+//
+// The kernel also decides whether the colours are honest, not just whether the
+// sheet is continuous. leaflet.heat bins points into squares of radius/2 px and
+// *sums* the intensities of everything sharing a bin before clamping at `max`:
+//
+//     g = radius/2;  bin = [floor(x/g), floor(y/g)];  bin[2] += intensity
+//
+// so the moment two grid points share a bin their risk scores add together and
+// clamp to solid red. Keeping radius below 2x the point spacing guarantees one
+// point per bin, which is what makes a score of 0.6 render as 0.6 at every zoom.
+// 0.75x the spacing sits comfortably inside that and still overlaps neighbours
+// enough to read as one surface rather than 800 separate dots.
+const KERNEL_RATIO = 0.75;
+// below this the kernel is too small to read as a surface, above it the blur can
+// no longer bridge the gap between points. outside the band the tiled cells take
+// over: same numbers, drawn as exact 1-degree squares.
+const HEAT_MIN_PX = 12, HEAT_MAX_PX = 260;
+
+function gridGeometry() {
   const spacing = (gridData && gridData.spacing_deg) || 1;
   const c = map.getCenter();
   const z = map.getZoom();
   const a = map.project([c.lat, c.lng], z);
   const b = map.project([c.lat, c.lng + spacing], z);
-  // 0.75 of the gap is the point where neighbouring kernels overlap enough to
-  // read as one surface without smearing a hot cell across its calm neighbours
-  const px = Math.abs(b.x - a.x) * 0.75;
-  return Math.max(18, Math.min(px, 260));
+  const spacingPx = Math.abs(b.x - a.x);
+  const radius = spacingPx * KERNEL_RATIO;
+  return { radius, faithful: radius >= HEAT_MIN_PX && radius <= HEAT_MAX_PX };
 }
 
 function resizeGridHeat() {
   if (!map.hasLayer(gridHeat)) return;
-  const r = gridKernel();
-  gridHeat.setOptions({ radius: r, blur: r * 0.85 });
-  // past the clamp the blur can no longer bridge the gap between points, so the
-  // tiled cells take over: they are the same numbers drawn as 1-degree squares,
-  // which tile exactly and therefore cover the country at any zoom. without this
-  // the map goes bare at city zoom and reads as missing data.
-  const needCells = r >= 260;
-  if (needCells !== autoCells) {
-    autoCells = needCells;
+  const g = gridGeometry();
+  // never clamp the radius into a range where points would share a bin. if the
+  // honest kernel is unusable at this zoom, stop drawing heat and let the cells
+  // carry the map instead of drawing a saturated sheet that lies about the data.
+  gridHeat.setOptions({ radius: g.radius, blur: g.radius * 0.85 });
+  gridHeat.setLatLngs(g.faithful && gridData ? gridData.points : []);
+  if (g.faithful !== !autoCells) {
+    autoCells = !g.faithful;
     drawCells();
   }
 }
@@ -204,7 +231,7 @@ async function loadGrid(layerName, day) {
   gridData = res;
   outlookDays = res.days || [];
   gridHeat.setLatLngs(res.points);
-  resizeGridHeat();
+  resizeGridHeat();   // may swap heat for cells depending on the current zoom
   drawCells();
   buildGridControls();
   buildOutlook();
@@ -314,8 +341,11 @@ function drawCells() {
   const half = (gridData.spacing_deg || 1) / 2;
   gridData.cells.forEach((c) => {
     L.rectangle([[c.lat - half, c.lon - half], [c.lat + half, c.lon + half]], {
+      // opacity is tuned to sit close to what the heat kernel renders at the
+      // same score, so crossing the zoom where one hands over to the other is
+      // not itself read as the colours changing
       color: scoreColor(c.v), weight: 0.5, fillColor: scoreColor(c.v),
-      fillOpacity: 0.45, interactive: true,
+      fillOpacity: 0.6, interactive: true,
     }).bindPopup(cellPopup(c)).addTo(gridCells);
   });
   gridCells.addTo(map);
@@ -535,13 +565,26 @@ async function assess(loc) {
   if (failed.length) {
     const note = document.createElement("p");
     note.className = "muted small mt-2";
-    // these are almost always a momentary feed timeout or the free archive
-    // rate limit, not a real gap in coverage, so say so and offer a retry
-    note.innerHTML = `${failed.length} module(s) couldn't load just now (a live data feed was busy): `
-      + `${failed.map(([s]) => s).join(", ")}. This is usually temporary. `
-      + `<a href="#" id="retry-assess">Retry</a>`;
+    // a momentary feed timeout and an exhausted daily quota look identical from
+    // here but need opposite advice: one is worth retrying immediately, the
+    // other will not clear until the upstream counter rolls over at UTC
+    // midnight. offering "Retry" for both is how someone ends up clicking it
+    // twenty times against a door that stays shut for another eight hours.
+    const wait = Math.max(0, ...failed.map(([, r]) => r.retry_after || 0));
+    const names = failed.map(([s]) => s).join(", ");
+    if (wait > 900) {
+      const hrs = Math.floor(wait / 3600), mins = Math.round((wait % 3600) / 60);
+      note.innerHTML = `${failed.length} module(s) are waiting on the weather API's `
+        + `free-tier quota, which resets in ${hrs ? hrs + "h " : ""}${mins}m: ${names}. `
+        + `Everything else on this page is live.`;
+    } else {
+      note.innerHTML = `${failed.length} module(s) couldn't load just now (a live data `
+        + `feed was busy): ${names}. This is usually temporary. `
+        + `<a href="#" id="retry-assess">Retry</a>`;
+    }
     matrixBody.appendChild(note);
-    document.getElementById("retry-assess").addEventListener("click", (e) => {
+    const retry = document.getElementById("retry-assess");
+    if (retry) retry.addEventListener("click", (e) => {
       e.preventDefault(); assess(loc);
     });
   }

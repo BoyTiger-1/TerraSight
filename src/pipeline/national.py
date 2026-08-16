@@ -150,10 +150,68 @@ def _units(locations, days):
     return locations * max(1, math.ceil(days / 14))
 
 
+# The grid's share of the *daily* quota.
+#
+# The pacer below used to police only the per-minute and per-hour ceilings, and
+# that is not the ceiling that took the site down. Open-Meteo also allows 10,000
+# units a day, one build is ~2,463 of them, and nothing was counting. On Render's
+# free tier the filesystem is ephemeral and the service spins down when idle, so
+# every cold start restored the grid committed in the repo -- whose generated_at
+# is fixed in the past and therefore always "stale" -- and immediately spent
+# another 2,463 units rebuilding a file the next cold start would throw away.
+# Four cold starts and the day's quota was gone before a single visitor clicked
+# anything, which is what made nine of sixteen modules answer "a live data feed
+# was busy".
+#
+# So the grid gets an explicit daily allowance and the rest belongs to people
+# actually using the site. One build fits; a storm of them does not.
+GRID_DAILY_UNITS = int(os.environ.get("TERRASIGHT_GRID_DAILY_UNITS", 3000))
+
+# Don't auto-build during the first stretch of a process's life. A cold start has
+# no way to tell "this grid is genuinely old" from "this grid is the one shipped
+# in the repo and I have simply forgotten that I already rebuilt it twice today",
+# and on a host that spins down every 15 idle minutes the second case is the
+# common one. The daily ledger above cannot catch it either: it lives in memory,
+# and the container that would remember the spend is the one that just died.
+#
+# Uptime is the one honest signal left. Render puts a free instance to sleep
+# after 15 idle minutes, so a container that boots for one visitor and lapses
+# never gets far past that; only one serving traffic continuously reaches half an
+# hour. Gating on that means casual spin-ups never build, while a genuinely busy
+# instance still refreshes the map once a day.
+GRID_MIN_UPTIME_SECONDS = int(os.environ.get("TERRASIGHT_GRID_MIN_UPTIME", 1800))
+
+_PROCESS_START = time.time()
+_daily_lock = threading.Lock()
+_daily_spend = {"utc_day": None, "units": 0}
+
+
+def _utc_day():
+    return int(time.time() // 86400)
+
+
+def daily_units_left():
+    """how much of the grid's daily allowance is still unspent.
+
+    the ledger resets on the UTC day boundary because that is when Open-Meteo's
+    own counter does."""
+    with _daily_lock:
+        if _daily_spend["utc_day"] != _utc_day():
+            _daily_spend.update(utc_day=_utc_day(), units=0)
+        return GRID_DAILY_UNITS - _daily_spend["units"]
+
+
+def _charge_daily(units):
+    with _daily_lock:
+        if _daily_spend["utc_day"] != _utc_day():
+            _daily_spend.update(utc_day=_utc_day(), units=0)
+        _daily_spend["units"] += units
+
+
 class _Pacer:
-    """spread request weight so we trip neither the per-minute nor the hourly
-    ceiling. the hourly one is the binding constraint for a full national build,
-    and it is the one that silently truncated the early versions of this job."""
+    """spread request weight so we trip none of the per-minute, hourly or daily
+    ceilings. the hourly one is the binding constraint inside a single build; the
+    daily one is what decides whether the rest of the site still works."""
 
     def __init__(self, units_per_minute=UNITS_PER_MINUTE, units_per_hour=UNITS_PER_HOUR):
         self.per_unit = 60.0 / max(units_per_minute, 1)
@@ -164,11 +222,11 @@ class _Pacer:
     def budget_left(self):
         cutoff = time.time() - 3600
         self.spent = [s for s in self.spent if s[0] > cutoff]
-        return self.hour_cap - sum(u for _, u in self.spent)
+        return min(self.hour_cap - sum(u for _, u in self.spent), daily_units_left())
 
     def wait(self, units):
-        """returns False when the hourly budget cannot cover this request, so
-        the caller can stop cleanly rather than collect a few hundred 429s"""
+        """returns False when the budget cannot cover this request, so the caller
+        can stop cleanly rather than collect a few hundred 429s"""
         if self.budget_left() < units:
             return False
         now = time.time()
@@ -177,6 +235,7 @@ class _Pacer:
             now = time.time()
         self.next_at = now + self.per_unit * units
         self.spent.append((now, units))
+        _charge_daily(units)
         return True
 
 
@@ -617,7 +676,11 @@ def summarize(rows, day=0):
 # ---------------------------------------------------------------- serving
 
 _state = {"grid": None, "building": False, "error": None, "phase": None,
-          "progress": (0, 0), "resume_at": None, "grid_mtime": 0.0}
+          "progress": (0, 0), "resume_at": None, "grid_mtime": 0.0,
+          # why the last stale grid was left alone instead of rebuilt, so the
+          # difference between "building" and "deliberately not building" is
+          # visible in /health rather than looking like a stuck job
+          "deferred": None}
 _state_lock = threading.Lock()
 
 
@@ -714,6 +777,24 @@ def _resume():
     _refresh()
 
 
+def _may_autobuild(grid):
+    """whether a stale grid is worth what a rebuild costs right now.
+
+    a heatmap that is a day old is a small problem. a heatmap that is current
+    because it spent the day's whole API quota, leaving every per-location module
+    answering "a live data feed was busy", is a much larger one. so the automatic
+    rebuild yields to all three of the things that make it a bad trade."""
+    if http_client.rate_limited_for(API_HOST) > 0:
+        return False, "rate_limited"
+    if daily_units_left() < _units(1, FINE_PAST_DAYS + FINE_FORECAST_DAYS) * 100:
+        return False, "daily_budget_spent"
+    if grid is not None and time.time() - _PROCESS_START < GRID_MIN_UPTIME_SECONDS:
+        # we have a grid to serve and this process is too young to know whether
+        # it is stale or merely restored from the repo by a cold start
+        return False, "warming_up"
+    return True, None
+
+
 def ensure(force=False):
     """return the current grid, kicking off a background rebuild if it is stale.
 
@@ -723,8 +804,11 @@ def ensure(force=False):
         grid = _synced_grid()
         stale = grid is None or (time.time() - grid.get("generated_at", 0)) > REFRESH_SECONDS
         if (stale or force) and not _state["building"]:
-            _state["building"] = True
-            threading.Thread(target=_refresh, name="national-grid", daemon=True).start()
+            allowed, why = (True, None) if force else _may_autobuild(grid)
+            _state["deferred"] = why
+            if allowed:
+                _state["building"] = True
+                threading.Thread(target=_refresh, name="national-grid", daemon=True).start()
         return grid
 
 
@@ -751,6 +835,8 @@ def status():
             "quota_limited": bool(grid.get("quota_limited")) if grid else False,
             "resume_in": (round(_state["resume_at"] - time.time())
                           if _state["resume_at"] else None),
+            "deferred": _state["deferred"],
+            "daily_units_left": daily_units_left(),
             "coverage_pct": (round(100.0 * grid.get("scored_points", 0)
                                    / max(grid.get("requested_points", 1), 1), 1)
                              if grid else 0),

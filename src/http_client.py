@@ -65,7 +65,15 @@ def _note_rate_limit(url, resp):
     if "hour" in reason.lower():
         until = now + (3600 - (now % 3600)) + 5
     elif "daily" in reason.lower():
-        until = now + 1800     # re-probe periodically rather than idling all day
+        # Open-Meteo's daily counter rolls over at UTC midnight, so re-probing
+        # every 30 minutes did not recover anything -- it just meant that 48
+        # times a day the app decided it was healthy, let a wave of requests
+        # through, collected 429s, and went dark again. Worse, runner.assess
+        # skips its neighbour sweep only while a limit is in force, so those
+        # false all-clear windows were also when it burned a dozen snapshots per
+        # module chasing coverage that no amount of walking could find. Wait for
+        # the actual reset and serve cached data until then.
+        until = now + (86400 - (now % 86400)) + 30
     else:
         until = now + 65
     with _lock:
@@ -223,6 +231,16 @@ def fetch_json(url, params=None, ttl=TTL_FORECAST, timeout=20):
         return cached
 
     stats["misses"] += 1
+    # the host has already told us its quota is spent and when it resets. asking
+    # again before then cannot succeed, and a page that runs sixteen modules over
+    # several feeds each turns that into a hundred pointless round trips before
+    # it can tell the user anything. fail fast on whatever we have instead.
+    if rate_limited_for(url) > 0:
+        if cached is not None:
+            stats["stale_served"] += 1
+            return cached
+        stats["failures"] += 1
+        return None
     try:
         resp = _get_retry(url, params, timeout)
         if resp is not None and resp.status_code == 429:

@@ -83,8 +83,13 @@ def assess(slug, snap, allow_fallback=True):
     # the neighbour sweep costs a dozen fresh snapshots. that is worth it for a
     # genuine coverage gap, but not when the upstream is simply throttled: every
     # neighbour would hit the same closed door, twelve times over per module.
-    if http_client.rate_limited_for(_PRIMARY_FEED) > 0:
-        return {"error": first_error, "rate_limited": True}
+    limited_for = http_client.rate_limited_for(_PRIMARY_FEED)
+    if limited_for > 0:
+        # tell the caller how long this actually lasts. a free-tier daily quota
+        # runs until UTC midnight, and inviting someone to hit Retry against a
+        # door that stays shut for another eight hours is worse than saying so.
+        return {"error": first_error, "rate_limited": True,
+                "retry_after": round(limited_for)}
 
     for radius in FALLBACK_RADII_KM:
         for clat, clon in ring(snap.lat, snap.lon, radius, count=4):
