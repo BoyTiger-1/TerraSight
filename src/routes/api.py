@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request
 
 from src import http_client
 from src.analysis import cascades, reports, scenario
-from src.ml import validate
+from src.ml import registry as ml_registry, validate
 from src.modules import MODULES, module_meta, runner
 from src.modules.snapshot import EnvSnapshot
 from src.pipeline import national, alerts
@@ -290,6 +290,7 @@ def health():
     return jsonify({"http_cache": dict(http_client.stats),
                     "rate_limits": http_client.limit_report(),
                     "cache_entries": http_client.cache_size(),
+                    "models": ml_registry.load_status(),
                     "national_grid": national.status(),
                     "snapshots_cached": len(_snaps)})
 

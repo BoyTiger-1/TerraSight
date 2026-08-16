@@ -8,6 +8,26 @@ import numpy as np
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 _loaded = {}
 
+# why a model failed to load. a silently missing model reports itself downstream
+# as "weather data unavailable", which sends you looking at the API feeds for a
+# problem that is actually in the pickle, so keep the real exception.
+_load_errors = {}
+
+
+def load_status():
+    """per-model load state for /api/health"""
+    out = {}
+    for name in ("wildfire", "flood"):
+        get_model(name)
+        out[name] = {"loaded": _loaded.get(name) is not None,
+                     "error": _load_errors.get(name)}
+    try:
+        import sklearn
+        out["sklearn"] = sklearn.__version__
+    except Exception:
+        out["sklearn"] = None
+    return out
+
 
 class HazardModel:
     def __init__(self, name):
@@ -47,6 +67,7 @@ def get_model(name):
     if name not in _loaded:
         try:
             _loaded[name] = HazardModel(name)
-        except Exception:
+        except Exception as e:
             _loaded[name] = None
+            _load_errors[name] = f"{type(e).__name__}: {e}"[:300]
     return _loaded[name]
