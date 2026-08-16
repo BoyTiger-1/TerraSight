@@ -70,8 +70,13 @@
 })();
 
 // ---------- homepage motion polish ----------
-// everything here bails out for users who prefer reduced motion
-if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hover: hover)").matches) {
+// Two tiers. Everything bails out for users who prefer reduced motion, and the
+// cursor-driven effects additionally need a pointer that can hover -- but the
+// scroll-linked ones must not, or a touch reader loses the hero fade and the
+// progress rule for no reason.
+const TS_MOTION = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+if (TS_MOTION && matchMedia("(hover: hover)").matches) {
 
   // soft glow that trails the cursor, lerped for a weighty feel
   const glow = document.createElement("div");
@@ -114,16 +119,40 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
   document.querySelectorAll(".bento .mod-card").forEach((card, i) => {
     card.style.transitionDelay = `${(i % 4) * 0.06}s`;
   });
+}
 
-  // gentle parallax + fade on the hero as it scrolls away
+// scroll-linked motion: no pointer required
+if (TS_MOTION) {
+
+  // Gentle parallax + fade on the hero as it scrolls away.
+  //
+  // Measured against the viewport, not a fixed pixel count. A hard 620px meant
+  // the hero was fully transparent barely half a screen down, so on a tall
+  // display the headline vanished while it still filled most of the window. The
+  // fade now holds for the first third of a screen and finishes as the hero
+  // leaves, and it eases rather than running linearly, so nothing snaps.
   const heroInner = document.querySelector(".hero-inner");
   if (heroInner) {
+    let queued = false;
+    const onScroll = () => {
+      const h = innerHeight || 800;
+      const t = Math.min(Math.max((scrollY - h * 0.34) / (h * 0.62), 0), 1);
+      heroInner.style.transform = `translateY(${Math.min(scrollY, h) * 0.16}px)`;
+      heroInner.style.opacity = `${1 - t * t}`;
+      queued = false;
+    };
     addEventListener("scroll", () => {
-      const y = Math.min(scrollY, 700);
-      heroInner.style.transform = `translateY(${y * 0.18}px)`;
-      heroInner.style.opacity = `${Math.max(1 - y / 620, 0)}`;
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(onScroll);
     }, { passive: true });
   }
+
+  // the hero writes itself in on load, one element at a time
+  document.querySelectorAll(".hero-inner .wrap > *").forEach((el, i) => {
+    el.classList.add("hero-rise");
+    el.style.animationDelay = `${0.08 + i * 0.09}s`;
+  });
 }
 
 // live stats strip fed by the overview endpoint
@@ -167,6 +196,7 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
   const dayLabel = document.getElementById("field-day");
   const ticks = document.getElementById("field-ticks");
   const frames = new Array(DAYS).fill(null);   // day -> offscreen canvas
+  const fields = new Array(DAYS).fill(null);   // day -> queryable TSField
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let day = 0, timer = null, spacing = 1, started = false, nearby = false;
 
@@ -186,10 +216,13 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
     canvas.height = Math.round(w * (Y0 - Y1) / ((E_LON - W_LON) * Math.PI / 180));
   };
 
-  // render one day's grid into an offscreen canvas at the current size
-  function renderFrame(data) {
+  // render one day's grid into an offscreen canvas at the current size.
+  // the built field is kept, not just the pixels, so hovering can ask it for
+  // the value at an arbitrary coordinate rather than sampling the image back.
+  function renderFrame(data, d) {
     const f = TSField.create();
     f.build(data);
+    fields[d] = f;
     spacing = data.spacing_deg || 1;
     const w = canvas.width, h = canvas.height;
     const off = document.createElement("canvas");
@@ -250,7 +283,7 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
       caption.textContent = "The national grid is rebuilding; the live map has the current field.";
       return;
     }
-    frames[0] = renderFrame(first);
+    frames[0] = renderFrame(first, 0);
     show(0);
     caption.textContent =
       `${first.cells.length.toLocaleString()} scored points at ${spacing}° spacing, ` +
@@ -267,7 +300,7 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
     for (let d = 1; d < DAYS; d++) {
       const res = await TS.fetchJSON(`/api/national/grid?layer=composite&day=${d}`);
       if (res.error || !res.cells || !res.cells.length) break;
-      frames[d] = renderFrame(res);
+      frames[d] = renderFrame(res, d);
       ticks.children[d].disabled = false;
     }
     play();
@@ -310,13 +343,46 @@ if (!matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(hove
     setNearby(r.bottom > -400 && r.top < innerHeight + 400);
   }, { passive: true });
 
+  // Hover readout. The claim this section makes is that every coordinate in the
+  // country resolves, and the cheapest way to prove it is to let someone point
+  // at an arbitrary pixel and get the number back. This asks the field object
+  // for that exact latitude and longitude rather than sampling the rendered
+  // image, so what appears is the model's value, not a colour read backwards.
+  if (matchMedia("(hover: hover)").matches) {
+    const tip = document.createElement("div");
+    tip.className = "field-tip";
+    tip.hidden = true;
+    canvas.parentElement.appendChild(tip);
+
+    const bandOf = (v) => v < 25 ? "Low" : v < 50 ? "Moderate" : v < 75 ? "High" : "Extreme";
+
+    canvas.addEventListener("pointermove", (e) => {
+      const f = fields[day];
+      if (!f) return;
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      const lon = W_LON + (e.offsetX / cw) * (E_LON - W_LON);
+      const lat = (2 * Math.atan(Math.exp(Y0 + (e.offsetY / ch) * (Y1 - Y0))) - Math.PI / 2) * 180 / Math.PI;
+      const v = f.value(lat, lon);
+      if (v === null) { tip.hidden = true; return; }   // offshore
+      const label = bandOf(v);
+      tip.innerHTML = `<i style="background:${TSField.rampColor(v)}"></i>`
+        + `<b>${v.toFixed(0)}</b> <span>${label}</span>`
+        + `<em>${lat.toFixed(1)}&deg;N ${Math.abs(lon).toFixed(1)}&deg;W</em>`;
+      tip.hidden = false;
+      // keep the card from clipping it near the edges
+      tip.style.left = `${Math.min(Math.max(e.offsetX, 70), cw - 70)}px`;
+      tip.style.top = `${Math.max(e.offsetY - 14, 44)}px`;
+    }, { passive: true });
+    canvas.addEventListener("pointerleave", () => { tip.hidden = true; }, { passive: true });
+  }
+
   // re-render at the new size on a real width change, debounced
   let rw = canvas.clientWidth, rt = null;
   addEventListener("resize", () => {
     if (Math.abs(canvas.clientWidth - rw) < 40) return;
     rw = canvas.clientWidth;
     clearTimeout(rt);
-    rt = setTimeout(() => { started = false; restStarted = false; frames.fill(null); stop(); load(); }, 300);
+    rt = setTimeout(() => { started = false; restStarted = false; frames.fill(null); fields.fill(null); stop(); load(); }, 300);
   }, { passive: true });
 })();
 

@@ -68,8 +68,9 @@ def generate(snap):
                           for r in elevated[:4])
         summary = (f"This assessment identifies {len(elevated)} hazard(s) at elevated levels "
                    f"for {snap.name}: {names}. "
-                   + ("Cross-hazard coupling is active and has raised downstream risks, "
-                      "detailed in the cascade section. " if any(
+                   + ("Cross-hazard coupling is active; the scores above are each module's "
+                      "own model, and the coupled downstream effects are detailed separately "
+                      "in the cascade section. " if any(
                           e["active"] and e["boost"] > 0 for e in bundle["edges"]) else "")
                    + "Recommended actions are prioritized below by urgency and audience.")
 

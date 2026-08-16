@@ -55,13 +55,17 @@
         <div class="panel-title"><svg width="15" height="15"><use href="#i-layers"/></svg>
           Multi-hazard risk matrix <span id="matrix-loc" class="muted"></span></div>
         <div id="matrix-body">
-          <p class="muted small">Pick a location above to run every module. Scores include
-          cross-hazard cascade adjustments; click any row for the full analysis.</p>
+          <p class="muted small">Pick a location above to run every module. Each score is that
+          module's own model, the same number its page shows; cross-hazard coupling is listed
+          separately below. Click any row for the full analysis.</p>
         </div>
       </div>
       <div class="card" id="cascade-card" hidden>
         <div class="panel-title"><svg width="15" height="15"><use href="#i-cascade"/></svg>
           Active cascade couplings</div>
+        <p class="muted small mt-1">Documented physical mechanisms by which one elevated hazard
+          raises another. These weights are expert judgement, not fitted parameters, so they are
+          shown as an overlay rather than folded into the scores above.</p>
         <div id="cascade-body"></div>
       </div>
     </div>

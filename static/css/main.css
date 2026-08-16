@@ -415,6 +415,12 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
   animation: shimmerword 6s ease-in-out infinite;
+  /* background-clip: text paints only inside the inline box, and an italic
+     glyph leans past its advance width, so the final letter of the word lost
+     its right edge. The padding gives the clip somewhere to land; the matching
+     negative margin keeps the word spacing where it was. */
+  padding-right: 0.14em;
+  margin-right: -0.08em;
 }
 @keyframes shimmerword { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 @media (prefers-reduced-motion: reduce) { .hero h1 .accent-word { animation: none; } }
@@ -793,6 +799,37 @@ table.data tr.row-mark td:first-child { box-shadow: inset 2px 0 0 var(--accent);
 .valid-row .nm { flex: 1; text-transform: capitalize; }
 .valid-row .mt { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); }
 .valid-row .mt b { color: var(--ink); font-weight: 600; }
+
+/* readout that follows the cursor across the national field preview */
+.field-tip {
+  position: absolute; z-index: 4; transform: translate(-50%, -100%);
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  padding: 7px 11px; border-radius: 999px; white-space: nowrap;
+  background: rgba(11, 15, 21, 0.88); border: 1px solid var(--border-soft);
+  backdrop-filter: blur(6px); font-family: var(--font-mono); font-size: 12px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+}
+.field-tip i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.field-tip b { color: var(--ink); font-size: 13px; }
+.field-tip span { color: var(--ink-2); }
+.field-tip em { font-style: normal; color: var(--ink-3); padding-left: 4px;
+  border-left: 1px solid var(--border-soft); }
+#field-preview { cursor: crosshair; }
+
+/* the coupled-score annotation on a matrix row. deliberately quiet: the row's
+   own number is the model's, and this says what the cascade layer would make of
+   it, so it has to read as a footnote rather than compete with the score. */
+.coupled-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em;
+  color: var(--ink-3); background: var(--surface-2);
+  border: 1px solid var(--border-soft); cursor: help; white-space: nowrap;
+}
+
+/* hero elements write themselves in on load */
+@keyframes heroRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.hero-rise { animation: heroRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .hero-rise { animation: none; } }
 
 /* the simulator teasers borrow .matrix-row for its rule and icon rhythm but
    carry prose instead of a score, so the two fixed right-hand columns go. */

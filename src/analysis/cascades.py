@@ -58,22 +58,35 @@ def run_all(snap):
                    for slug, r in results.items() if "error" not in r}
     adjusted, edges = apply(base_scores)
 
-    # write the coupling outcome back onto each module result
+    # Record the coupling outcome alongside each module result, but leave
+    # `assessment` holding what the module's own model said.
+    #
+    # This used to overwrite `assessment.score` with the coupled value, which
+    # meant one hazard at one place had two different numbers depending on which
+    # page you were looking at: the matrix showed the coupled score and the
+    # module page, which scores a single module and never runs the coupling,
+    # showed the model's. At Bothell that was wildfire 27.1 against wildfire 2.1.
+    #
+    # Overwriting was the wrong half to keep. The weights below are hand-set
+    # physical judgements, not fitted parameters, and nothing in /api/validation
+    # measures them -- the published AUC and Brier scores belong to the module
+    # models alone. A 0.20 edge from a drought sitting at 95 adds 25 points on
+    # its own, so silently folding it in lets an unvalidated heuristic
+    # substitute for a validated model rather than annotate it. The coupled
+    # total is still returned, per module and per edge, for callers that want to
+    # show it as the separate analysis layer it is.
+    from src.config import risk_band
     for slug, r in results.items():
         if "error" in r:
             continue
         before = r["assessment"]["score"]
         after = round(adjusted.get(slug, before), 1)
+        label, color = risk_band(after)
         incoming = [e for e in edges if e["target"] == slug and e["active"] and e["boost"] > 0]
         outgoing = [e for e in edges if e["source"] == slug and e["active"]]
         r["cascades"] = {"score_before": before, "score_after": after,
+                         "level_after": label, "color_after": color,
                          "incoming": incoming, "outgoing": outgoing}
-        if after != before:
-            from src.config import risk_band
-            label, color = risk_band(after)
-            r["assessment"]["score"] = after
-            r["assessment"]["level"] = label
-            r["assessment"]["color"] = color
 
     return {"results": results, "edges": edges,
             "scores": {s: round(adjusted.get(s, v), 1) for s, v in base_scores.items()}}
