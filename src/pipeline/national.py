@@ -154,18 +154,52 @@ def _units(locations, days):
 #
 # The pacer below used to police only the per-minute and per-hour ceilings, and
 # that is not the ceiling that took the site down. Open-Meteo also allows 10,000
-# units a day, one build is ~2,463 of them, and nothing was counting. On Render's
+# units a day, one build is ~3,300 of them, and nothing was counting. On Render's
 # free tier the filesystem is ephemeral and the service spins down when idle, so
 # every cold start restored the grid committed in the repo -- whose generated_at
 # is fixed in the past and therefore always "stale" -- and immediately spent
-# another 2,463 units rebuilding a file the next cold start would throw away.
-# Four cold starts and the day's quota was gone before a single visitor clicked
-# anything, which is what made nine of sixteen modules answer "a live data feed
-# was busy".
+# another full build's worth rebuilding a file the next cold start would throw
+# away. Three cold starts and the day's quota was gone before a single visitor
+# clicked anything, which is what made nine of sixteen modules answer "a live
+# data feed was busy".
 #
 # So the grid gets an explicit daily allowance and the rest belongs to people
 # actually using the site. One build fits; a storm of them does not.
-GRID_DAILY_UNITS = int(os.environ.get("TERRASIGHT_GRID_DAILY_UNITS", 3000))
+#
+# Size it off the real cost rather than a round number. The first version of this
+# used 3,000, which was derived from the fine tier alone (821 x 3 = 2,463) and
+# quietly forgot the 833-unit memory tier that precedes it -- so a full build
+# came to 3,296 and every single one truncated 296 units short of finishing, by
+# arithmetic, every time. Deriving the constant instead of guessing it means that
+# cannot drift out of sync when the grid spacing or the lookback window changes.
+GRID_DAILY_UNITS = int(os.environ.get("TERRASIGHT_GRID_DAILY_UNITS", 0)) or None
+
+_build_units_cache = None
+
+
+def full_build_units():
+    """what one complete build actually costs, memory tier included"""
+    global _build_units_cache
+    if _build_units_cache is None:
+        _build_units_cache = (
+            _units(len(us_grid.build(MEMORY_SPACING_DEG)), MEMORY_PAST_DAYS)
+            + _units(len(us_grid.build(us_grid.SPACING_CONUS)),
+                     FINE_PAST_DAYS + FINE_FORECAST_DAYS))
+    return _build_units_cache
+
+
+def _daily_cap():
+    """the grid's allowance for a UTC day: one full build plus a little slack for
+    the retry of a batch that failed, unless explicitly overridden"""
+    return GRID_DAILY_UNITS or int(full_build_units() * 1.1)
+
+# A build the operator asked for is not the thing this ledger exists to prevent.
+# The allowance reserves headroom for visitors against *unattended* rebuild
+# storms; `python -m src.pipeline.national` is someone deciding to spend it, and
+# capping that at the automatic share is how the documented way to refresh the
+# shipped grid ends up producing a truncated one. It still respects the real
+# ceiling, just not the self-imposed share.
+GRID_CLI_DAILY_UNITS = int(os.environ.get("TERRASIGHT_GRID_CLI_UNITS", 9000))
 
 # Don't auto-build during the first stretch of a process's life. A cold start has
 # no way to tell "this grid is genuinely old" from "this grid is the one shipped
@@ -190,15 +224,16 @@ def _utc_day():
     return int(time.time() // 86400)
 
 
-def daily_units_left():
+def daily_units_left(cap=None):
     """how much of the grid's daily allowance is still unspent.
 
     the ledger resets on the UTC day boundary because that is when Open-Meteo's
-    own counter does."""
+    own counter does. `cap` overrides the automatic share for a build the
+    operator asked for explicitly."""
     with _daily_lock:
         if _daily_spend["utc_day"] != _utc_day():
             _daily_spend.update(utc_day=_utc_day(), units=0)
-        return GRID_DAILY_UNITS - _daily_spend["units"]
+        return (cap or _daily_cap()) - _daily_spend["units"]
 
 
 def _charge_daily(units):
@@ -213,16 +248,19 @@ class _Pacer:
     ceilings. the hourly one is the binding constraint inside a single build; the
     daily one is what decides whether the rest of the site still works."""
 
-    def __init__(self, units_per_minute=UNITS_PER_MINUTE, units_per_hour=UNITS_PER_HOUR):
+    def __init__(self, units_per_minute=UNITS_PER_MINUTE, units_per_hour=UNITS_PER_HOUR,
+                 daily_cap=None):
         self.per_unit = 60.0 / max(units_per_minute, 1)
         self.next_at = 0.0
         self.hour_cap = units_per_hour
+        self.daily_cap = daily_cap   # None means the automatic share
         self.spent = []          # (timestamp, units) over the trailing hour
 
     def budget_left(self):
         cutoff = time.time() - 3600
         self.spent = [s for s in self.spent if s[0] > cutoff]
-        return min(self.hour_cap - sum(u for _, u in self.spent), daily_units_left())
+        return min(self.hour_cap - sum(u for _, u in self.spent),
+                   daily_units_left(self.daily_cap))
 
     def wait(self, units):
         """returns False when the budget cannot cover this request, so the caller
@@ -561,14 +599,17 @@ def _carry_forward(failed, previous):
     return carried, still_missing
 
 
-def build(progress=None):
+def build(progress=None, daily_cap=None):
     """fetch and score the whole national grid. blocking, takes a few minutes.
 
     this is deliberately incremental: whatever the current pass cannot reach
     keeps its previous score, so repeated passes converge on full coverage even
-    when a single pass cannot fit inside the free tier's hourly budget."""
+    when a single pass cannot fit inside the free tier's hourly budget.
+
+    daily_cap lifts the automatic daily share for an operator-initiated run; see
+    GRID_CLI_DAILY_UNITS."""
     started = time.time()
-    pacer = _Pacer()
+    pacer = _Pacer(daily_cap=daily_cap)
     previous = _load_cache()
 
     memory = _load_memory()
@@ -822,7 +863,13 @@ def _may_autobuild(grid):
     rebuild yields to all three of the things that make it a bad trade."""
     if http_client.rate_limited_for(API_HOST) > 0:
         return False, "rate_limited"
-    if daily_units_left() < _units(1, FINE_PAST_DAYS + FINE_FORECAST_DAYS) * 100:
+    # require enough left to actually get somewhere. the first cut of this asked
+    # for 300 units, a hundred points' worth, which is how the live instance
+    # ended up starting a rebuild it could only spend on 429s and finishing with
+    # fresh_points: 0 -- a full pass costs eleven times that. a build that starts
+    # should be able to cover the memory tier and a real share of the fine one;
+    # anything less is churn that leaves the grid no better than it found it.
+    if daily_units_left() < full_build_units() // 2:
         return False, "daily_budget_spent"
     if grid is not None and time.time() - _PROCESS_START < GRID_MIN_UPTIME_SECONDS:
         # we have a grid to serve and this process is too young to know whether
@@ -873,6 +920,8 @@ def status():
                           if _state["resume_at"] else None),
             "deferred": _state["deferred"],
             "daily_units_left": daily_units_left(),
+            "daily_units_cap": _daily_cap(),
+            "full_build_units": full_build_units(),
             "coverage_pct": (round(100.0 * grid.get("scored_points", 0)
                                    / max(grid.get("requested_points", 1), 1), 1)
                              if grid else 0),
@@ -928,8 +977,8 @@ def layer(name="composite", day=0):
 if __name__ == "__main__":  # python -m src.pipeline.national
     def show(phase, done, total):
         print(f"  {phase}: {done}/{total}   ", end="\r", flush=True)
-    print("building the national grid...")
-    g = build(progress=show)
+    print(f"building the national grid... (~{full_build_units()} API units)")
+    g = build(progress=show, daily_cap=GRID_CLI_DAILY_UNITS)
     _write_json(CACHE_FILE, g)
     # a command line build is still a build, so it belongs in the change history
     # the same way the scheduled refresh does
